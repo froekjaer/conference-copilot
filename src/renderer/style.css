@@ -1,0 +1,32 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; background: #12151c; color: #e8ecf3; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #232a36; position: sticky; top: 0; background: #12151c; z-index: 5; }
+h1 { font-size: 17px; margin: 0; font-weight: 600; }
+h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .06em; color: #8fa1bb; }
+main { padding: 14px 18px 28px; display: grid; gap: 14px; grid-template-columns: 1fr; }
+.kort { background: #171b24; border: 1px solid #232a36; border-radius: 10px; padding: 14px; }
+.raekke { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.raekke:last-child { margin-bottom: 0; }
+.felt { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #9fb0c8; }
+.felt.bred { flex: 1 1 100%; }
+.felt b { color: #e8ecf3; }
+.vaelger, .input, input[type="number"] { background: #10141b; color: #e8ecf3; border: 1px solid #2b3444; border-radius: 8px; padding: 8px 10px; min-width: 160px; }
+input[type="range"] { width: 190px; }
+.knap { background: #232c3b; color: #e8ecf3; border: 1px solid #334054; border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+.knap:hover { background: #2b3648; }
+.knap.primaer { background: #1f6feb; border-color: #2b7bf5; }
+.knap.primaer:hover { background: #2a7cf7; }
+.knap:disabled { opacity: .45; cursor: default; }
+.sekundaer { background: #1b2230; }
+.pille { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #334054; }
+.pille-off { color: #9fb0c8; }
+.pille-live { background: #17361f; border-color: #2e7d45; color: #a8f0bf; }
+.pille-fejl { background: #3a1d1d; border-color: #a33; color: #ffc2c2; }
+.muted { color: #8fa1bb; font-size: 12px; }
+.afkrydsning { display: flex; gap: 8px; align-items: center; font-size: 13px; color: #c7d3e4; }
+.live { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
+.live-blok { background: #10141b; border: 1px solid #232a36; border-radius: 8px; padding: 10px; min-height: 78px; }
+.live-tekst { margin-top: 6px; font-size: 15px; }
+.log { background: #0d1117; border: 1px solid #232a36; border-radius: 8px; padding: 8px 10px; max-height: 190px; overflow: auto; font: 12px/1.5 Consolas, monospace; color: #9fb0c8; }
+.log div { white-space: pre-wrap; }

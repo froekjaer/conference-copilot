@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <title>Conference Co-Pilot</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Conference Co-Pilot <span id="version" class="muted"></span></h1>
+    <div id="statusPille" class="pille pille-off">ikke startet</div>
+  </header>
+
+  <main>
+    <section class="kort">
+      <h2>1 · Lydindgang</h2>
+      <div class="raekke">
+        <select id="enhedsVaelger" class="vaelger"></select>
+        <button id="opdaterEnheder" class="knap sekundaer" title="Opdater listen">↻</button>
+      </div>
+      <div class="raekke">
+        <label class="felt"><span>Kildesprog</span>
+          <select id="kildeSprog" class="vaelger">
+            <option value="da">Dansk</option><option value="en">English</option>
+            <option value="de">Deutsch</option><option value="fr">Français</option>
+            <option value="es">Español</option><option value="it">Italiano</option>
+          </select>
+        </label>
+        <label class="felt"><span>Målsprog</span>
+          <select id="maalSprog" class="vaelger">
+            <option value="en">English</option><option value="da">Dansk</option>
+            <option value="de">Deutsch</option><option value="fr">Français</option>
+            <option value="es">Español</option><option value="it">Italiano</option>
+          </select>
+        </label>
+        <label class="felt"><span>Lydblok (sek.)</span>
+          <input id="chunkSekunder" type="number" min="3" max="20" value="6" />
+        </label>
+      </div>
+      <div class="raekke">
+        <button id="startKnap" class="knap primaer">▶ Start</button>
+        <button id="stopKnap" class="knap" disabled>■ Stop</button>
+        <span id="niveauTekst" class="muted">niveau: –</span>
+      </div>
+      <div id="lydStatus" class="muted"></div>
+    </section>
+
+    <section class="kort">
+      <h2>2 · API-nøgle og model</h2>
+      <div class="raekke">
+        <input id="noegleInput" type="password" class="input" placeholder="Indsæt API-nøgle (gemmes krypteret med Windows DPAPI)" autocomplete="off" />
+        <button id="gemNoegle" class="knap">Gem</button>
+        <button id="sletNoegle" class="knap sekundaer">Slet</button>
+      </div>
+      <div id="noegleStatus" class="muted"></div>
+      <div class="raekke">
+        <label class="felt bred"><span>Base-URL (OpenAI-kompatibel)</span>
+          <input id="baseUrl" class="input" value="https://api.openai.com/v1" />
+        </label>
+      </div>
+      <div class="raekke">
+        <label class="felt"><span>Transskriptionsmodel</span><input id="sttModel" class="input" value="whisper-1" /></label>
+        <label class="felt"><span>Oversættelsesmodel</span><input id="mtModel" class="input" value="gpt-4o-mini" /></label>
+      </div>
+      <div class="raekke">
+        <label class="afkrydsning"><input id="demoTilstand" type="checkbox" /> Demo-tilstand (ingen API-kald — til test af overlay og transskript)</label>
+      </div>
+      <div class="raekke">
+        <button id="testForbindelse" class="knap sekundaer">Test forbindelse</button>
+        <span id="testStatus" class="muted"></span>
+      </div>
+    </section>
+
+    <section class="kort">
+      <h2>3 · Undertekst-overlay</h2>
+      <div class="raekke">
+        <label class="felt"><span>Skærm</span><select id="skaermVaelger" class="vaelger"></select></label>
+        <label class="felt"><span>Tekststørrelse <b id="fontVaerdi">34</b> px</span>
+          <input id="fontStoerrelse" type="range" min="16" max="72" value="34" />
+        </label>
+        <label class="felt"><span>Baggrund <b id="alphaVaerdi">55</b> %</span>
+          <input id="baggrundAlpha" type="range" min="0" max="95" value="55" />
+        </label>
+      </div>
+      <div class="raekke">
+        <label class="afkrydsning"><input id="visKilde" type="checkbox" checked /> Vis originalsprog ovenover</label>
+        <label class="afkrydsning"><input id="klikGennem" type="checkbox" checked /> Klik gennem overlayet (mus går til PowerPoint)</label>
+      </div>
+      <div class="raekje raekke">
+        <button id="visOverlay" class="knap sekundaer">Vis overlay</button>
+        <button id="skjulOverlay" class="knap sekundaer">Skjul overlay</button>
+        <button id="testTekst" class="knap sekundaer">Send prøvetekst</button>
+      </div>
+    </section>
+
+    <section class="kort">
+      <h2>4 · Live</h2>
+      <div class="live">
+        <div class="live-blok"><span class="muted">Kilde</span><div id="liveKilde" class="live-tekst">–</div></div>
+        <div class="live-blok"><span class="muted">Oversat</span><div id="liveOversat" class="live-tekst">–</div></div>
+      </div>
+      <div class="raekke">
+        <span id="taeller" class="muted">0 blokke · 0 ord</span>
+        <button id="aabnMappe" class="knap sekundaer">Åbn transskriptionsmappe</button>
+      </div>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

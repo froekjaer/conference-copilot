@@ -1,0 +1,17 @@
+# Afhængigheder og byggede artefakter
+node_modules/
+dist/
+build/
+
+# Brugerdata (transskriptioner, indstillinger, krypteret nøgle)
+data/
+
+# Logfiler og testresultater fra kørsel
+*.log
+selftest-*.json
+selftest-*.png
+
+# OS-støj
+Thumbs.db
+desktop.ini
+.DS_Store
