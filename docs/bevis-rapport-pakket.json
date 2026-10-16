@@ -1,0 +1,52 @@
+{
+  "tid": "2026-10-16T19:53:45.224Z",
+  "pakket": true,
+  "version": "0.1.0",
+  "trin": [
+    {
+      "navn": "vinduer",
+      "ok": true,
+      "detalje": "kontrol=true overlay=true"
+    },
+    {
+      "navn": "skaerme",
+      "ok": true,
+      "detalje": "antal=1"
+    },
+    {
+      "navn": "lydenheder",
+      "ok": true,
+      "detalje": "[\"Default - Microphone Array (Qualcomm(R) Aqstic(TM) ACX Static Endpoints Audio Device)\",\"Communications - Microphone Array (Qualcomm(R) Aqstic(TM) ACX Static Endpoints Audio Devic"
+    },
+    {
+      "navn": "mikrofon-capture",
+      "ok": true,
+      "detalje": "{\"ok\":true,\"varighedMs\":1500,\"topNiveau\":1}"
+    },
+    {
+      "navn": "overlay-render",
+      "ok": true,
+      "detalje": "png=65151 bytes"
+    },
+    {
+      "navn": "transskript-skrivning",
+      "ok": true,
+      "detalje": "C:\\Users\\passp\\AppData\\Local\\Temp\\cc-zip-test\\data\\transskriptioner\\selftest.txt"
+    },
+    {
+      "navn": "demo-stt",
+      "ok": true,
+      "detalje": "Velkommen til konferencen. Vi starter om et øjeblik."
+    },
+    {
+      "navn": "demo-mt",
+      "ok": true,
+      "detalje": "Welcome to the conference. We will begin in a moment."
+    },
+    {
+      "navn": "kryptering-tilgaengelig",
+      "ok": true,
+      "detalje": "safeStorage/DPAPI"
+    }
+  ]
+}
