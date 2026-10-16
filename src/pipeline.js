@@ -1,11 +1,19 @@
-// Kerne-logik for Conference Co-Pilot: tale→tekst, oversættelse, transskript-linjer og genforsoeg.
+// Kerne-logik for Conference Co-Pilot: tale→tekst, oversaettelse, transskript-linjer og genforsoeg.
 // Rene funktioner uden Electron-afhaengigheder, saa de kan unit-testes i almindelig Node.
+// Hemmeligheder holdes i variabler (aldrig literaler) og skrives ikke til filer eller logs.
 
 export const STANDARD_BASE_URL = "https://api.openai.com/v1";
 export const STANDARD_STT_MODEL = "whisper-1";
 export const STANDARD_MT_MODEL = "gpt-4o-mini";
 
-/** Kort, ikke-foelsom fejlbeskrivelse til UI/log (ingen noegler, ingen fuld URL med query). */
+/** Bygger auth-headere uden at noeglen nogensinde indgaa i en log eller fil. */
+function authHoveder(noegle, ekstra = {}) {
+  const h = new Headers(ekstra);
+  h.set("Authorization", `Bearer ${noegle}`);
+  return h;
+}
+
+/** Kort, ikke-foelsom fejlbeskrivelse til UI/log. */
 export function beskrivFejl(fejl) {
   if (!fejl) return "ukendt fejl";
   if (fejl.name === "AbortError") return "tidsgraense overskredet";
@@ -37,8 +45,7 @@ export async function medGenforsoeg(fn, { forsog = 3, baseMs = 600, sleep = (ms)
 export function byggSttForm(audioBuffer, mimeType = "audio/webm", { model = STANDARD_STT_MODEL, language = "" } = {}) {
   const form = new FormData();
   const endelse = mimeType.includes("wav") ? "wav" : mimeType.includes("mp4") ? "mp4" : "webm";
-  const blob = new Blob([audioBuffer], { type: mimeType });
-  form.append("file", blob, `lyd.${endelse}`);
+  form.append("file", new Blob([audioBuffer], { type: mimeType }), `lyd.${endelse}`);
   form.append("model", model);
   if (language) form.append("language", language);
   form.append("response_format", "json");
@@ -46,13 +53,13 @@ export function byggSttForm(audioBuffer, mimeType = "audio/webm", { model = STAN
 }
 
 /** Tale → tekst. Returnerer { ok, tekst, fejl }. */
-export async function transkriber({ audioBuffer, mimeType, apiKey, baseUrl = STANDARD_BASE_URL, model = STANDARD_STT_MODEL, language = "", fetchImpl = fetch, timeoutMs = 30000 }) {
+export async function transkriber({ audioBuffer, mimeType, noegle, baseUrl = STANDARD_BASE_URL, model = STANDARD_STT_MODEL, language = "", fetchImpl = fetch, timeoutMs = 30000 }) {
   if (!audioBuffer || audioBuffer.byteLength < 1200) return { ok: false, fejl: "for lidt lyd" };
   const url = `${baseUrl.replace(/\/+$/, "")}/audio/transcriptions`;
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const svar = await fetchImpl(url, { method: "POST", headers: { authorization: `Bearer ${apiKey}` }, body: byggSttForm(audioBuffer, mimeType, { model, language }), signal: ctrl.signal });
+    const svar = await fetchImpl(url, { method: "POST", headers: authHoveder(noegle), body: byggSttForm(audioBuffer, mimeType, { model, language }), signal: ctrl.signal });
     if (!svar.ok) return { ok: false, fejl: `STT HTTP ${svar.status}: ${(await svar.text()).slice(0, 160)}` };
     const j = await svar.json();
     return { ok: true, tekst: String(j.text || "").trim() };
@@ -75,7 +82,7 @@ export function byggOversaettelsesPrompt(tekst, fra, til) {
 }
 
 /** Tekst → oversaettelse. Returnerer { ok, tekst, fejl }. */
-export async function oversaet({ tekst, fra = "da", til = "en", apiKey, baseUrl = STANDARD_BASE_URL, model = STANDARD_MT_MODEL, fetchImpl = fetch, timeoutMs = 20000 }) {
+export async function oversaet({ tekst, fra = "da", til = "en", noegle, baseUrl = STANDARD_BASE_URL, model = STANDARD_MT_MODEL, fetchImpl = fetch, timeoutMs = 20000 }) {
   if (!tekst || !tekst.trim()) return { ok: true, tekst: "" };
   const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
   const ctrl = new AbortController();
@@ -83,14 +90,13 @@ export async function oversaet({ tekst, fra = "da", til = "en", apiKey, baseUrl 
   try {
     const svar = await fetchImpl(url, {
       method: "POST",
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+      headers: authHoveder(noegle, { "Content-Type": "application/json" }),
       body: JSON.stringify({ model, messages: byggOversaettelsesPrompt(tekst, fra, til), temperature: 0 }),
       signal: ctrl.signal,
     });
     if (!svar.ok) return { ok: false, fejl: `MT HTTP ${svar.status}: ${(await svar.text()).slice(0, 160)}` };
     const j = await svar.json();
-    const svarTekst = j?.choices?.[0]?.message?.content;
-    return { ok: true, tekst: String(svarTekst || "").trim() };
+    return { ok: true, tekst: String(j?.choices?.[0]?.message?.content || "").trim() };
   } catch (e) {
     return { ok: false, fejl: beskrivFejl(e) };
   } finally {
@@ -98,7 +104,7 @@ export async function oversaet({ tekst, fra = "da", til = "en", apiKey, baseUrl 
   }
 }
 
-/** Demo/offline-tilstand: bruges til at teste hele keden uden API-noegle. */
+/** Demo/offline-tilstand: bruges til at teste hele kaeden uden API-noegle. */
 export function demoTranksriber(sekvens = 0) {
   const linjer = [
     "Velkommen til konferencen. Vi starter om et øjeblik.",

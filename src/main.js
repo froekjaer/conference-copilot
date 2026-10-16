@@ -1,9 +1,9 @@
 // Conference Co-Pilot — hovedproces.
 // To vinduer: kontrolpanelet og det gennemsigtige undertekst-overlay.
 // Al logik er pakket i try/catch, saa netvaerks- og lysfejl aldrig braender appen ned.
-import { app, BrowserWindow, ipcMain, screen, safeStorage, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, screen, safeStorage } from "electron";
 import { join, dirname } from "node:path";
-import { mkdirSync, writeFileSync, appendFileSync, existsSync, readFileSync } from "node:fs";
+import { writeFileSync, appendFileSync, existsSync } from "node:fs";
 import {
   transkriber, oversaet, demoTranksriber, demoOversaet,
   byggTranskriptLinje, byggTranskriptJson, beskrivFejl,
@@ -11,7 +11,7 @@ import {
 } from "./pipeline.js";
 import {
   laesIndstillinger, gemIndstillinger, gemHemmelighed, laesHemmelighed, sletHemmelighed,
-  sikrMappe, STANDARD_INDSTILLINGER,
+  sikrMappe,
 } from "./storage.js";
 
 const SELFTEST = process.argv.includes("--selftest");
@@ -19,7 +19,6 @@ const dataMappe = app.isPackaged ? join(dirname(process.execPath), "data") : joi
 const indstillingerFil = join(dataMappe, "indstillinger.json");
 const hemmelighedFil = join(dataMappe, "hemmelighed.bin");
 const transskriptMappe = join(dataMappe, "transskriptioner");
-sikrMappe(join(dataMappe, "x"));
 
 let kontrolVindue = null;
 let overlayVindue = null;
@@ -35,7 +34,7 @@ const krypto = {
 function hentNoegle() {
   const fraMiljoe = process.env.CO_PILOT_API_KEY;
   if (fraMiljoe && fraMiljoe.trim()) return { noegle: fraMiljoe.trim(), kilde: "miljøvariabel" };
-  const laest = laesHemmelighed(hemmeligFil, krypto);
+  const laest = laesHemmelighed(hemmelighedFil, krypto);
   return laest.ok ? { noegle: laest.noegle, kilde: "DPAPI" } : { noegle: "", kilde: "ingen" };
 }
 
@@ -45,21 +44,21 @@ function opretKontrol() {
     width: 940, height: 700, minWidth: 820, minHeight: 560,
     title: "Conference Co-Pilot",
     backgroundColor: "#12151c",
-    webPreferences: { preload: join(app.getAppPath(), "src", "preload.js"), contextIsolation: true, nodeIntegration: false },
+    webPreferences: { preload: join(app.getAppPath(), "src", "preload.cjs"), contextIsolation: true, nodeIntegration: false },
   });
   kontrolVindue.loadFile(join(app.getAppPath(), "src", "renderer", "index.html"));
   kontrolVindue.on("closed", () => { kontrolVindue = null; });
-  if (SELFTEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerSelftest(), 1200));
+  if (SELFTEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerSelftest(), 1500));
 }
 
 function opretOverlay() {
-  const skaerm = vaelgSkærm(indstillinger?.overlay?.skaermId);
+  const skaerm = vaelgSkaerm(indstillinger?.overlay?.skaermId);
   const { x, y, width, height } = overlayGeometri(skaerm);
   overlayVindue = new BrowserWindow({
     x, y, width, height,
     transparent: true, frame: false, alwaysOnTop: true, skipTaskbar: true, hasShadow: false,
     resizable: false, movable: false, focusable: false, show: false,
-    webPreferences: { preload: join(app.getAppPath(), "src", "preload.js"), contextIsolation: true, nodeIntegration: false },
+    webPreferences: { preload: join(app.getAppPath(), "src", "preload.cjs"), contextIsolation: true, nodeIntegration: false },
   });
   overlayVindue.setAlwaysOnTop(true, "screen-saver");
   overlayVindue.setIgnoreMouseEvents(indstillinger.overlay.klikGennem !== false, { forward: true });
@@ -71,7 +70,7 @@ function opretOverlay() {
   overlayVindue.on("closed", () => { overlayVindue = null; });
 }
 
-function vaelgSkærm(skaermId) {
+function vaelgSkaerm(skaermId) {
   const alle = screen.getAllDisplays();
   if (skaermId && alle.some((d) => d.id === skaermId)) return alle.find((d) => d.id === skaermId);
   return screen.getPrimaryDisplay();
@@ -85,9 +84,8 @@ function overlayGeometri(skaerm) {
 
 function placerOverlay() {
   if (!overlayVindue) return;
-  const skaerm = vaelgSkærm(indstillinger?.overlay?.skaermId);
-  const g = overlayGeometri(skaerm);
-  overlayVindue.setBounds(g);
+  const skaerm = vaelgSkaerm(indstillinger?.overlay?.skaermId);
+  overlayVindue.setBounds(overlayGeometri(skaerm));
   overlayVindue.setIgnoreMouseEvents(indstillinger.overlay.klikGennem !== false, { forward: true });
 }
 
@@ -114,10 +112,6 @@ ipcMain.handle("info", svar(async () => {
 ipcMain.handle("displays", svar(async () => ({
   skaerme: screen.getAllDisplays().map((d, i) => ({ id: d.id, indeks: i, primaer: d.id === screen.getPrimaryDisplay().id, bounds: d.bounds, scaleFactor: d.scaleFactor })),
 })));
-ipcMain.handle("audio:permissions", svar(async () => {
-  // Paa Windows er mikrofonadgang styret af systemindstillinger; vi spoerger Chromium.
-  return { ok: true };
-}));
 
 ipcMain.handle("settings:get", svar(async () => ({ indstillinger })));
 ipcMain.handle("settings:set", svar(async (del) => {
@@ -132,9 +126,9 @@ ipcMain.handle("secrets:status", svar(async () => {
   const n = hentNoegle();
   return { harNoegle: Boolean(n.noegle), kilde: n.kilde, kryptering: krypto.tilgaengelig() };
 }));
-ipcMain.handle("secrets:set", svar(async (noegle) => {
-  if (!noegle || !String(noegle).trim()) throw new Error("tom noegle");
-  const r = gemHemmelighed(hemmelighedFil, String(noegle).trim(), krypto);
+ipcMain.handle("secrets:set", svar(async (nyNoegle) => {
+  if (!nyNoegle || !String(nyNoegle).trim()) throw new Error("tom noegle");
+  const r = gemHemmelighed(hemmelighedFil, String(nyNoegle).trim(), krypto);
   if (!r.ok) throw new Error(r.fejl);
   return { kilde: "DPAPI" };
 }));
@@ -159,12 +153,12 @@ ipcMain.handle("overlay:vis", svar(async (vis) => {
 }));
 
 ipcMain.handle("stt:transcribe", svar(async ({ buffer, mimeType, language }) => {
-  if (indstillinger.provider === "demo") { const t = demoTranksriber(demoSekvens++); return { tekst: t, demo: true }; }
-  const { noegle } = hentNoegle();
-  if (!noegle) throw new Error("ingen API-noegle sat (Demo-tilstand kan bruges)");
+  if (indstillinger.provider === "demo") return { tekst: demoTranksriber(demoSekvens++), demo: true };
+  const n = hentNoegle();
+  if (!n.noegle) throw new Error("ingen API-noegle sat (Demo-tilstand kan bruges)");
   const r = await transkriber({
     audioBuffer: Buffer.from(buffer), mimeType,
-    apiKey: noegle,
+    noegle: n.noegle,
     baseUrl: indstillinger.baseUrl || STANDARD_BASE_URL,
     model: indstillinger.sttModel || STANDARD_STT_MODEL,
     language: language || indstillinger.kildeSprog || "",
@@ -175,11 +169,11 @@ ipcMain.handle("stt:transcribe", svar(async ({ buffer, mimeType, language }) => 
 
 ipcMain.handle("mt:translate", svar(async ({ tekst, fra, til }) => {
   if (indstillinger.provider === "demo") return { tekst: demoOversaet(tekst), demo: true };
-  const { noegle } = hentNoegle();
-  if (!noegle) throw new Error("ingen API-noegle sat (Demo-tilstand kan bruges)");
+  const n = hentNoegle();
+  if (!n.noegle) throw new Error("ingen API-noegle sat (Demo-tilstand kan bruges)");
   const r = await oversaet({
     tekst, fra: fra || indstillinger.kildeSprog, til: til || indstillinger.maalSprog,
-    apiKey: noegle,
+    noegle: n.noegle,
     baseUrl: indstillinger.baseUrl || STANDARD_BASE_URL,
     model: indstillinger.mtModel || STANDARD_MT_MODEL,
   });
@@ -199,9 +193,9 @@ ipcMain.handle("transcript:append", svar(async ({ kilde, oversat }) => {
 ipcMain.handle("transcript:mappe", svar(async () => ({ mappe: transskriptMappe })));
 ipcMain.handle("test:forbindelse", svar(async () => {
   if (indstillinger.provider === "demo") return { svar: "(demo)", demo: true };
-  const { noegle } = hentNoegle();
-  if (!noegle) throw new Error("ingen API-noegle sat");
-  const r = await oversaet({ tekst: "Test.", fra: "da", til: "en", apiKey: noegle, baseUrl: indstillinger.baseUrl, model: indstillinger.mtModel });
+  const n = hentNoegle();
+  if (!n.noegle) throw new Error("ingen API-noegle sat");
+  const r = await oversaet({ tekst: "Test.", fra: "da", til: "en", noegle: n.noegle, baseUrl: indstillinger.baseUrl, model: indstillinger.mtModel });
   if (!r.ok) throw new Error(r.fejl);
   return { svar: r.tekst };
 }));
@@ -213,26 +207,22 @@ async function koerSelftest() {
   try {
     tilfoej("vinduer", Boolean(kontrolVindue && overlayVindue), `kontrol=${Boolean(kontrolVindue)} overlay=${Boolean(overlayVindue)}`);
     tilfoej("skaerme", screen.getAllDisplays().length >= 1, `antal=${screen.getAllDisplays().length}`);
-    // enheder spoerges i renderer (kraever getUserMedia)
+
     const enheder = await kontrolVindue.webContents.executeJavaScript("window.__selftestEnheder ? window.__selftestEnheder() : Promise.resolve(null)");
     tilfoej("lydenheder", Boolean(enheder && enheder.length), JSON.stringify(enheder || []).slice(0, 180));
-    const mikrofonsvar = await kontrolVindue.webContents.executeJavaScript("window.__selftestMikrofon ? window.__selftestMikrofon() : Promise.resolve(null)");
-    tilfoej("mikrofon-capture", Boolean(mikrofonsvar?.ok), JSON.stringify(mikrofonsvar || {}).slice(0, 180));
 
-    // overlay-tekst + skaermbillede
+    const mikrofon = await kontrolVindue.webContents.executeJavaScript("window.__selftestMikrofon ? window.__selftestMikrofon() : Promise.resolve(null)");
+    tilfoej("mikrofon-capture", Boolean(mikrofon?.ok), JSON.stringify(mikrofon || {}).slice(0, 180));
+
     overlayVindue.webContents.send("overlay:tekst", { kilde: "Velkommen til konferencen.", oversat: "Welcome to the conference." });
     await new Promise((r) => setTimeout(r, 900));
-    const billede = await overlayVindue.webContents.capturePage();
-    const png = billede.toPNG();
+    const png = (await overlayVindue.webContents.capturePage()).toPNG();
     writeFileSync(join(dataMappe, "selftest-overlay.png"), png);
     tilfoej("overlay-render", png.length > 1000, `png=${png.length} bytes`);
 
-    // transskript-skrivning
-    const d = new Date();
-    appendFileSync(join(transskriptMappe, "selftest.txt"), byggTranskriptLinje({ kilde: "selftest kilde", oversat: "selftest translation", fra: "da", til: "en", dato: d }), "utf8");
+    appendFileSync(join(transskriptMappe, "selftest.txt"), byggTranskriptLinje({ kilde: "selftest kilde", oversat: "selftest translation", fra: "da", til: "en", dato: new Date() }), "utf8");
     tilfoej("transskript-skrivning", existsSync(join(transskriptMappe, "selftest.txt")), join(transskriptMappe, "selftest.txt"));
 
-    // demo-pipeline (simuleret STT+MT uden noegle)
     const t = demoTranksriber(0);
     tilfoej("demo-stt", Boolean(t), t);
     tilfoej("demo-mt", Boolean(demoOversaet(t)), demoOversaet(t));
@@ -247,6 +237,8 @@ async function koerSelftest() {
 
 // ---------------------------------------------------------------- opstart
 app.whenReady().then(() => {
+  sikrMappe(join(dataMappe, "x"));
+  sikrMappe(join(transskriptMappe, "x"));
   opretKontrol();
   opretOverlay();
   app.on("activate", () => { if (!kontrolVindue) opretKontrol(); });

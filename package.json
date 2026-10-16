@@ -3,6 +3,7 @@
   "productName": "Conference Co-Pilot",
   "version": "0.1.0",
   "description": "Portable Windows live transcription + translation with a transparent subtitle overlay for PowerPoint",
+  "type": "module",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -11,11 +12,7 @@
     "package": "node tools/package.mjs"
   },
   "author": "Peter Froekjaer",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "private": true,
-  "devDependencies": {
-    "electron": "^44.8.0"
-  },
-  "keywords": [],
-  "type": "commonjs"
+  "devDependencies": {}
 }
