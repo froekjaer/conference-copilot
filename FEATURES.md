@@ -1,7 +1,19 @@
 # Funktioner, begrænsninger og testresultater
 
-**Version:** 0.2.0 · **Opdateret:** 17-10-2026
+**Version:** 0.2.1 · **Opdateret:** 17-10-2026
 Simulerede og virkelige tests er markeret hver for sig.
+
+## Rettelser i 0.2.1
+
+**Underteksten blev hængende på skærmen, når kontrolpanelet blev lukket.** Overlay-vinduet holdt processen i live, så appen aldrig afsluttede, og Windows blev efterladt med det sidste billede som et "spøgelse" — tydeligst på en sekundær skærm.
+
+Rettet med en ordentlig lukkevej: når kontrolpanelet lukkes (eller appen afsluttes på anden måde), skjules overlayet, sættes til gennemsigtigt, og først derefter destrueres vinduet — med et lille tidsrum, så Windows kan fjerne billedet. Processen afslutter nu selv.
+
+| Test | Resultat |
+|---|---|
+| `--quit-test` i udviklingsmiljø | ✅ proces afslutter med kode 0, overlay destrueret, 0 efterladte processer |
+| `--quit-test` i pakket 0.2.1-ZIP | ✅ samme resultat |
+| Intern selftest efter ændringen | ✅ 16/16 |
 
 ## Nyt i 0.2.0
 

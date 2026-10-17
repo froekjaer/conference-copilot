@@ -18,6 +18,7 @@ import { geometriFor, presetGeometri, standardStoerrelse, skaermNoegle, klamp } 
 import { UDBYDERE, MODELLER, validerValg } from "./modeller.js";
 
 const SELFTEST = process.argv.includes("--selftest");
+const QUIT_TEST = process.argv.includes("--quit-test");
 const LYDFIL_TEST = (process.argv.find((a) => a.startsWith("--lydfil-test=")) || "").split("=")[1] || "";
 const TVANG_DEMO = process.argv.includes("--demo");
 const dataMappe = app.isPackaged ? join(dirname(process.execPath), "data") : join(app.getAppPath(), "data");
@@ -30,6 +31,7 @@ let overlayVindue = null;
 let indstillinger = laesIndstillinger(indstillingerFil);
 let demoSekvens = 0;
 let gemTid = null;
+let afslutter = false;
 
 const krypto = {
   tilgaengelig: () => { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } },
@@ -55,9 +57,17 @@ function opretKontrol() {
     webPreferences: { preload: join(app.getAppPath(), "src", "preload.cjs"), contextIsolation: true, nodeIntegration: false },
   });
   kontrolVindue.loadFile(join(app.getAppPath(), "src", "renderer", "index.html"));
-  kontrolVindue.on("closed", () => { kontrolVindue = null; });
+  kontrolVindue.on("closed", async () => {
+    kontrolVindue = null;
+    await lukOverlay();
+    if (QUIT_TEST) {
+      try { writeFileSync(join(dataMappe, "quit-test.json"), JSON.stringify({ tid: new Date().toISOString(), overlayVæk: !overlayVindue }, null, 2), "utf8"); } catch { /* intet */ }
+    }
+    app.quit();
+  });
   if (SELFTEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerSelftest(), 1500));
   if (LYDFIL_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerLydfilTest(LYDFIL_TEST), 1500));
+  if (QUIT_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => { if (kontrolVindue) kontrolVindue.close(); }, 2500));
 }
 
 function vaelgSkaerm(skaermId) {
@@ -128,6 +138,18 @@ function placerOverlay(geo) {
   const g = geo || geometriFor(skaerm, indstillinger.overlay);
   overlayVindue.setBounds(klamp(g, skaerm.workArea));
   return g;
+}
+
+// Lukker overlayet paent: skjul + gennemsigtigt foerst, saa Windows naar at fjerne billedet,
+// derefter destroy. Uden dette kan den sidste undertekst blive staaende som et spook paa skaermen.
+async function lukOverlay() {
+  if (!overlayVindue || overlayVindue.isDestroyed()) { overlayVindue = null; return; }
+  const v = overlayVindue;
+  overlayVindue = null;
+  try { v.setOpacity(0); } catch { /* intet */ }
+  try { v.hide(); } catch { /* intet */ }
+  await new Promise((r) => setTimeout(r, 180));
+  try { if (!v.isDestroyed()) v.destroy(); } catch { /* intet */ }
 }
 
 // ---------------------------------------------------------------- IPC
@@ -414,4 +436,13 @@ app.whenReady().then(() => {
   app.on("activate", () => { if (!kontrolVindue) opretKontrol(); });
 });
 app.on("window-all-closed", () => app.quit());
+app.on("before-quit", async (e) => {
+  if (afslutter) return;
+  if (overlayVindue && !overlayVindue.isDestroyed()) {
+    e.preventDefault();
+    afslutter = true;
+    await lukOverlay();
+    app.quit();
+  }
+});
 process.on("uncaughtException", (e) => { try { console.error("uventet fejl:", beskrivFejl(e)); } catch { /* intet */ } });
