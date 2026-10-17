@@ -27,6 +27,13 @@ export function erStille(samples, graense = 0.004) {
   return rms(samples) < graense;
 }
 
+/** Skal et tomt svar proeves igen med whisper-1? Kun naar der faktisk er tale i blokken. */
+export function skalProeveIgen(tekst, niveau, model) {
+  if (String(tekst || "").trim()) return false;
+  if (!model || String(model) === "whisper-1") return false;
+  return Number(niveau) > 0.02;
+}
+
 /** Kendte hallucinationer fra Whisper på stilhed/kort lyd — skal ikke ud i underteksterne. */
 export function erHallucination(tekst) {
   const t = String(tekst || "").toLowerCase();

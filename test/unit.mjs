@@ -12,7 +12,7 @@ import { presetGeometri, klamp, geometriFor, skaermNoegle, typografi, standardSt
 import { modellerFor, validerValg } from "../src/modeller.js";
 import { kodWav, udsnit } from "../src/wav.js";
 import { normaliserIndstillinger } from "../src/storage.js";
-import { normChunk, forventetForsinkelse, rms, erStille, erHallucination } from "../src/flow.js";
+import { normChunk, forventetForsinkelse, rms, erStille, erHallucination, skalProeveIgen } from "../src/flow.js";
 
 let ok = 0, alt = 0;
 const tjek = (navn, bestaaet, detalje = "") => {
@@ -209,6 +209,10 @@ try {
   tjek("flow: kendt hallucination genkendes", erHallucination("If you like this video, you can subscribe to the channel") === true);
   tjek("flow: almindelig dansk tekst er ikke hallucination", erHallucination("Der var engang en fattig kone") === false);
   tjek("flow: tom tekst er ikke hallucination", erHallucination("") === false);
+  tjek("retry: tomt svar paa tale proeves igen", skalProeveIgen("", 0.3, "gpt-4o-mini-transcribe") === true);
+  tjek("retry: tomt svar paa stilhed proeves ikke", skalProeveIgen("", 0.005, "gpt-4o-mini-transcribe") === false);
+  tjek("retry: svar med tekst proeves ikke", skalProeveIgen("hej", 0.4, "gpt-4o-mini-transcribe") === false);
+  tjek("retry: whisper-1 proeves ikke igen", skalProeveIgen("", 0.4, "whisper-1") === false);
 }
 
 console.log("");

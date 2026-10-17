@@ -1,7 +1,25 @@
 # Funktioner, begrænsninger og testresultater
 
-**Version:** 0.2.2 · **Opdateret:** 17-10-2026
+**Version:** 0.2.3 · **Opdateret:** 17-10-2026
 Simulerede og virkelige tests er markeret hver for sig.
+
+## Rettelser i 0.2.3
+
+| Fejl | Årsag | Rettelse |
+|---|---|---|
+| **Kunne ikke vælge sprog ind/ud** | Sprogvælgerne faldt ud, da brugerfladen blev bygget om i 0.2.0 — appen brugte stadig de gemte værdier (dansk → engelsk), så det så ud som om sprogvalget virkede | **Kildesprog** og **Målsprog** er tilbage som lister (da/en/de/fr/es/it) plus **⇄ Byt**; valget gemmes og nulstiller konteksten |
+| **Dårlig oversættelse** | Blokke på 4 s bliver afklippet midt i sætninger, og oversætteren så kun fragmentet uden at kende sammenhængen | Oversætteren får nu **deforegående tekst som kontekst** (op til 240 tegn) og en instruks om ikke at digte videre på et afklippet fragment |
+| **Manglende undertekster** | `gpt-4o-mini-transcribe` returnerede tomt på en blok med tydelig tale (målt ved 80 s i testfilen), så en hel sætning forsvandt | Hvis svaret er tomt **og** der er tale i blokken (niveau > 2 %), prøves én gang med `whisper-1` — den returnerede sætningen korrekt |
+| Tom række i lydfil-tilstand | Lydindgangsrækken blev kun skjult halvt | Rækken skjules helt |
+| **Baggrundsafspilning blev bremset** | Chromium satte afspilning og timere på pause, når vinduet ikke var i forgrunden — det rammer rigtig brug, når PowerPoint ligger foran | `backgroundThrottling: false` på begge vinduer, så behandlingen kører videre, mens præsentationen er i fokus |
+
+### Målt kvalitet (4 s blokke, rigtig dansk tale)
+
+| STT | MT | 68 s | 80 s |
+|---|---|---|---|
+| whisper-1 | gpt-4o-mini | ✅ "there weren't many fish in them" | ✅ "You should say, many more" |
+| gpt-4o-mini-transcribe | gpt-4o-mini | ✅ | ❌ **tomt svar** |
+| gpt-4o-mini-transcribe + fallback | gpt-4o-mini | ✅ | ✅ "You need to say many more" (2,5 s) |
 
 ## Rettelser og forbedringer i 0.2.2
 
@@ -59,7 +77,7 @@ Rettet med en ordentlig lukkevej: når kontrolpanelet lukkes (eller appen afslut
 
 | Test | Type | Resultat |
 |---|---|---|
-| Unit-tests (`npm test`) | Simuleret | ✅ **69/69** — inkl. 12 nye for blokstørrelse, forsinkelsesberegning, stilhed, hallucinationer og v3-migrering |
+| Unit-tests (`npm test`) | Simuleret | ✅ **73/73** — inkl. 4 nye for fallback-beslutningen |
 | Intern selftest, udviklingsmiljø | **Virkelig** | ✅ **17/17** — inkl. 481 skrifttyper, 2 skærme, lydudgange, kontrolpanel- og overlay-render |
 | Stop-knap | **Virkelig** | ✅ **3/3** — afspilning starter, Stop stopper og nulstiller, knapperne skifter |
 | Lydfil-test gennem den rigtige UI | **Virkelig** | ✅ **4/4** — 4 s WAV afkodet, 1 blok behandlet, overlay-tekst vist, PNG gemt |

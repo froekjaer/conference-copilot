@@ -16,9 +16,12 @@ import {
 } from "./storage.js";
 import { vaelgNoegle, laesNoegleFil } from "./noegle.js";
 import { geometriFor, presetGeometri, standardStoerrelse, skaermNoegle, klamp } from "./layout.js";
+import { skalProeveIgen } from "./flow.js";
 import { UDBYDERE, MODELLER, validerValg } from "./modeller.js";
 
 const SELFTEST = process.argv.includes("--selftest");
+// Appen afspiller lydfiler programmatisk (og testerne gor det uden museklik)
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 const QUIT_TEST = process.argv.includes("--quit-test");
 const LYDFIL_TEST = (process.argv.find((a) => a.startsWith("--lydfil-test=")) || "").split("=")[1] || "";
 const STOP_TEST = (process.argv.find((a) => a.startsWith("--stop-test=")) || "").split("=")[1] || "";
@@ -57,7 +60,7 @@ function opretKontrol() {
     width: 1020, height: 780, minWidth: 900, minHeight: 620,
     title: "Conference Co-Pilot",
     backgroundColor: "#12151c",
-    webPreferences: { preload: join(app.getAppPath(), "src", "preload.cjs"), contextIsolation: true, nodeIntegration: false },
+    webPreferences: { preload: join(app.getAppPath(), "src", "preload.cjs"), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   });
   kontrolVindue.loadFile(join(app.getAppPath(), "src", "renderer", "index.html"));
   kontrolVindue.on("closed", async () => {
@@ -106,7 +109,7 @@ function opretOverlay() {
     ...g,
     transparent: true, frame: false, alwaysOnTop: true, skipTaskbar: true, hasShadow: false,
     resizable: false, movable: true, focusable: false, show: false,
-    webPreferences: { preload: join(app.getAppPath(), "src", "preload.cjs"), contextIsolation: true, nodeIntegration: false },
+    webPreferences: { preload: join(app.getAppPath(), "src", "preload.cjs"), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   });
   overlayVindue.setAlwaysOnTop(true, "screen-saver");
   overlayVindue.setIgnoreMouseEvents(!indstillinger.overlay.redigering, { forward: true });
@@ -314,27 +317,35 @@ ipcMain.handle("overlay:vis", svar(async (vis) => {
   return { synlig: Boolean(vis) };
 }));
 
-ipcMain.handle("stt:transcribe", svar(async ({ buffer, mimeType, language }) => {
+ipcMain.handle("stt:transcribe", svar(async ({ buffer, mimeType, language, niveau }) => {
   if (indstillinger.demo || TVANG_DEMO) return { tekst: demoTranksriber(demoSekvens++), demo: true };
   const n = hentNoegle();
   if (!n.noegle) throw new Error("ingen API-nøgle sat (Demo-tilstand kan bruges)");
-  const r = await transkriber({
+  const valg = {
     audioBuffer: Buffer.from(buffer), mimeType,
     noegle: n.noegle,
     baseUrl: indstillinger.baseUrl || STANDARD_BASE_URL,
     model: indstillinger.sttModel || STANDARD_STT_MODEL,
     language: language || indstillinger.kildeSprog || "",
-  });
+  };
+  const r = await transkriber(valg);
   if (!r.ok) throw new Error(r.fejl);
+
+  // Den hurtige model kan sjældent returnere tomt paa tale — saa proever vi én gang med whisper-1
+  if (skalProeveIgen(r.tekst, niveau, valg.model)) {
+    const r2 = await transkriber({ ...valg, model: "whisper-1" });
+    if (r2.ok && r2.tekst.trim()) return { tekst: r2.tekst, fallback: "whisper-1" };
+  }
   return { tekst: r.tekst };
 }));
 
-ipcMain.handle("mt:translate", svar(async ({ tekst, fra, til }) => {
+ipcMain.handle("mt:translate", svar(async ({ tekst, fra, til, kontekst }) => {
   if (indstillinger.demo || TVANG_DEMO) return { tekst: demoOversaet(tekst), demo: true };
   const n = hentNoegle();
   if (!n.noegle) throw new Error("ingen API-nøgle sat (Demo-tilstand kan bruges)");
   const r = await oversaet({
     tekst, fra: fra || indstillinger.kildeSprog, til: til || indstillinger.maalSprog,
+    kontekst: kontekst || "",
     noegle: n.noegle,
     baseUrl: indstillinger.baseUrl || STANDARD_BASE_URL,
     model: indstillinger.mtModel || STANDARD_MT_MODEL,
@@ -448,6 +459,7 @@ async function koerLydfilTest(sti) {
     const r = await kontrolVindue.webContents.executeJavaScript(`window.__testLydfil(${JSON.stringify(sti)}, ${FRA_SEK})`);
     tilfoej("afkodning", Boolean(r?.ok) && r.varighed > 0, `${Number(r?.varighed || 0).toFixed(1)} s`);
     tilfoej("blokke behandlet", Number(r?.blokke) > 0, `${r?.blokke} blokke, ${r?.ord} ord, ${r?.ms} ms for ${Number(r?.blokSek || 0).toFixed(1)} s lyd`);
+    tilfoej("kilde-tekst", Boolean(r?.kilde), String(r?.kilde || "").slice(0, 130));
     tilfoej("overlay-tekst", Boolean(r?.oversat), String(r?.oversat || "").slice(0, 90));
     await new Promise((res) => setTimeout(res, 700));
     const png = (await overlayVindue.webContents.capturePage()).toPNG();
@@ -467,7 +479,7 @@ async function koerStopTest(sti) {
   const tilfoej = (navn, ok, detalje) => rapport.trin.push({ navn, ok, detalje: String(detalje ?? "").slice(0, 240) });
   try {
     const r = await kontrolVindue.webContents.executeJavaScript(`window.__testStop(${JSON.stringify(sti)})`);
-    tilfoej("afspilning starter", r?.foer?.paused === false, JSON.stringify(r?.foer));
+    tilfoej("afspilning starter", r?.foer?.paused === false, JSON.stringify(r?.foer || r?.fejl || r));
     tilfoej("stop stopper afspilningen", r?.efter?.paused === true && r?.efter?.tid === 0, JSON.stringify(r?.efter));
     tilfoej("knapperne skifter tilstand", r?.efter?.startKnapSlaaetFra === false && r?.efter?.stopKnapSlaaetFra === true, "start aktiv, stop inaktiv");
   } catch (e) {

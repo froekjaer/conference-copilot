@@ -9,7 +9,7 @@ const T = {
   stream: null, recorder: null, optager: false, analyser: null, niveauTimer: null,
   audioCtx: null, buffer: null, audioEl: null, blobUrl: null,
   sidsteSendt: 0, tikTimer: null, behandler: Promise.resolve(),
-  blokke: 0, ord: 0, session: 0, forsinkelser: [],
+  blokke: 0, ord: 0, session: 0, forsinkelser: [], kontekst: "", blokTop: 0,
 };
 
 const log = (tekst) => {
@@ -56,6 +56,8 @@ async function gem(del) {
 async function anvendIndstillinger() {
   const i = T.indstillinger;
   $("lydKilde").value = i.lydKilde || "mikrofon";
+  $("kildeSprog").value = i.kildeSprog;
+  $("maalSprog").value = i.maalSprog;
   $("chunkSekunder").value = i.chunkSekunder;
   $("hastighed").value = String(i.hastighed || 1);
   $("baseUrl").value = i.baseUrl;
@@ -199,7 +201,7 @@ async function fyldSkaerme() {
 // ---------------------------------------------------------------- lydfil
 function skiftLydKilde() {
   const fil = $("lydKilde").value === "fil";
-  $("enhedFelt").style.display = fil ? "none" : "";
+  $("enhedRaekke").style.display = fil ? "none" : "";
   $("udgangFelt").style.display = fil ? "" : "none";
   $("filFelt").style.display = fil ? "" : "none";
   $("transportFelt").style.display = fil ? "" : "none";
@@ -356,17 +358,18 @@ function koerBehandling(fn) {
   return T.behandler;
 }
 
-async function behandl(bytes, mime, tid, startet = performance.now(), rmsVaerdi = null) {
+async function behandl(bytes, mime, tid, startet = performance.now(), niveauVaerdi = null) {
   const i = T.indstillinger;
   const minSession = T.session;
-  const stt = await window.copilot.stt({ buffer: bytes, mimeType: mime, language: i.kildeSprog });
+  const stt = await window.copilot.stt({ buffer: bytes, mimeType: mime, language: i.kildeSprog, niveau: niveauVaerdi });
+  if (stt.fallback) log(`tomt svar fra ${i.sttModel} — brugte whisper-1 i stedet`);
   if (minSession !== T.session) return;
   if (!stt.ok) throw new Error("transskription: " + stt.fejl);
   const tekst = (stt.tekst || "").trim();
   if (!tekst) return;
 
   // Whisper kan finde paa at skrive "abonnér paa kanalen" paa stilhed — det skal ikke ud i salen
-  if (erHallucination(tekst) && (rmsVaerdi === null || rmsVaerdi < 0.02)) {
+  if (erHallucination(tekst) && (niveauVaerdi === null || niveauVaerdi < 0.02)) {
     log(`[${tid}] kasseret hallucination: ${tekst.slice(0, 50)}`);
     return;
   }
@@ -375,7 +378,7 @@ async function behandl(bytes, mime, tid, startet = performance.now(), rmsVaerdi 
   await window.copilot.overlay.tekst({ kilde: tekst, oversat: "…", tid });
   $("kildeTekst").textContent = tekst;
 
-  const mt = await window.copilot.mt({ tekst, fra: i.kildeSprog, til: i.maalSprog });
+  const mt = await window.copilot.mt({ tekst, fra: i.kildeSprog, til: i.maalSprog, kontekst: T.kontekst || "" });
   if (minSession !== T.session) return;
   const oversat = mt.ok ? mt.tekst : "";
   if (!mt.ok) log("FEJL oversættelse: " + mt.fejl);
@@ -385,6 +388,8 @@ async function behandl(bytes, mime, tid, startet = performance.now(), rmsVaerdi 
 
   T.blokke += 1;
   T.ord += tekst.split(/\s+/).filter(Boolean).length;
+  T.kontekst = (T.kontekst ? T.kontekst + " " : "") + tekst;
+  if (T.kontekst.length > 240) T.kontekst = T.kontekst.slice(-240);
   $("oversatTekst").textContent = oversat;
   $("blokTal").textContent = `${T.blokke} blokke`;
   $("ordTal").textContent = `${T.ord} ord`;
@@ -423,7 +428,9 @@ async function startLive() {
     if (!e.data || e.data.size < 1200) return;
     const bytes = new Uint8Array(await e.data.arrayBuffer());
     const tid = fmtTid((Date.now() - start) / 1000);
-    koerBehandling(() => behandl(bytes, mime, tid));
+    const niveau = T.blokTop || 0;
+    T.blokTop = 0;
+    koerBehandling(() => behandl(bytes, mime, tid, performance.now(), niveau));
   };
   T.recorder.onstop = () => log("Optagelse stoppet");
   T.recorder.start(chunk * 1000);
@@ -448,6 +455,7 @@ function startNiveau() {
     T.analyser.getByteTimeDomainData(data);
     let top = 0;
     for (let i = 0; i < data.length; i++) top = Math.max(top, Math.abs(data[i] - 128) / 128);
+    T.blokTop = Math.max(T.blokTop || 0, top);
     $("niveauTekst").textContent = `niveau: ${Math.round(top * 100)} %`;
   }, 200);
 }
@@ -559,6 +567,25 @@ $("stopKnap").addEventListener("click", () => {
   saetStatus("stoppet");
 });
 $("chunkSekunder").addEventListener("change", () => gem({ chunkSekunder: Number($("chunkSekunder").value) }));
+$("kildeSprog").addEventListener("change", async () => {
+  T.kontekst = "";
+  await gem({ kildeSprog: $("kildeSprog").value });
+  log("Kildesprog: " + $("kildeSprog").options[$("kildeSprog").selectedIndex].text);
+});
+$("maalSprog").addEventListener("change", async () => {
+  T.kontekst = "";
+  await gem({ maalSprog: $("maalSprog").value });
+  log("Målsprog: " + $("maalSprog").options[$("maalSprog").selectedIndex].text);
+});
+$("byttSprog").addEventListener("click", async () => {
+  const fra = $("maalSprog").value;
+  const til = $("kildeSprog").value;
+  $("kildeSprog").value = fra;
+  $("maalSprog").value = til;
+  T.kontekst = "";
+  await gem({ kildeSprog: fra, maalSprog: til });
+  log(`Sprog byttet: ${fra} → ${til}`);
+});
 
 $("vaelgNoegleFil").addEventListener("click", async () => {
   const r = await window.copilot.dialog.noegleFil();
@@ -716,15 +743,19 @@ window.__testLydfil = async (sti, fraSek = 0) => {
 
 // Bruges af main-processens --stop-test: afspiller, klikker Stop og rapporterer tilstanden.
 window.__testStop = async (sti) => {
-  await indlaesLydFil(sti, String(sti).split(/[\\/]/).pop());
-  if (!T.buffer) return { ok: false, fejl: "kunne ikke afkode lydfilen" };
-  await afspilFil();
-  await new Promise((r) => setTimeout(r, 1200));
-  const foer = { paused: T.audioEl.paused, tid: T.audioEl.currentTime, stopKnapSlaaetFra: $("stopKnap").disabled };
-  stopFil();
-  await new Promise((r) => setTimeout(r, 400));
-  const efter = { paused: T.audioEl.paused, tid: T.audioEl.currentTime, startKnapSlaaetFra: $("startKnap").disabled, stopKnapSlaaetFra: $("stopKnap").disabled };
-  return { ok: foer.paused === false && efter.paused === true && efter.tid === 0, foer, efter };
+  try {
+    await indlaesLydFil(sti, String(sti).split(/[\\/]/).pop());
+    if (!T.buffer) return { ok: false, fejl: "kunne ikke afkode lydfilen" };
+    await afspilFil();
+    await new Promise((r) => setTimeout(r, 1200));
+    const foer = { paused: T.audioEl.paused, tid: T.audioEl.currentTime, stopKnapSlaaetFra: $("stopKnap").disabled };
+    stopFil();
+    await new Promise((r) => setTimeout(r, 400));
+    const efter = { paused: T.audioEl.paused, tid: T.audioEl.currentTime, startKnapSlaaetFra: $("startKnap").disabled, stopKnapSlaaetFra: $("stopKnap").disabled };
+    return { ok: foer.paused === false && efter.paused === true && efter.tid === 0, foer, efter };
+  } catch (e) {
+    return { ok: false, fejl: String(e?.message || e), navn: String(e?.name || ""), foer: null, efter: null };
+  }
 };
 
 indlaes().catch((e) => log("FEJL opstart: " + e.message));

@@ -83,17 +83,20 @@ export async function transkriber({ audioBuffer, mimeType, noegle, baseUrl = STA
 
 const SPROGNAVN = { da: "Danish", en: "English", de: "German", fr: "French", es: "Spanish", it: "Italian" };
 
-export function byggOversaettelsesPrompt(tekst, fra, til) {
+export function byggOversaettelsesPrompt(tekst, fra, til, kontekst = "") {
   const fraNavn = SPROGNAVN[fra] || fra || "the source language";
   const tilNavn = SPROGNAVN[til] || til;
+  const medKontekst = kontekst && kontekst.trim()
+    ? ` The preceding part of the talk is given for reference only (do not translate it again): "${String(kontekst).trim().slice(-240)}". Use it to resolve pronouns, cut-off words and negations.`
+    : "";
   return [
-    { role: "system", content: `You are a simultaneous interpreter for a live conference. Translate the user's text from ${fraNavn} to ${tilNavn}. Reply with the translation ONLY - no quotes, no explanations, no extra text. Preserve names, numbers and technical terms.` },
+    { role: "system", content: `You are a simultaneous interpreter for a live conference. Translate the user's text from ${fraNavn} to ${tilNavn}. Reply with the translation ONLY - no quotes, no explanations, no extra text. Preserve names, numbers and technical terms. The text may be a fragment cut off mid-sentence, so keep the meaning of the fragment and do not invent the rest.${medKontekst}` },
     { role: "user", content: tekst },
   ];
 }
 
 /** Tekst → oversaettelse. Returnerer { ok, tekst, fejl }. */
-export async function oversaet({ tekst, fra = "da", til = "en", noegle, baseUrl = STANDARD_BASE_URL, model = STANDARD_MT_MODEL, fetchImpl = fetch, timeoutMs = 20000 }) {
+export async function oversaet({ tekst, fra = "da", til = "en", noegle, baseUrl = STANDARD_BASE_URL, model = STANDARD_MT_MODEL, kontekst = "", fetchImpl = fetch, timeoutMs = 20000 }) {
   if (!tekst || !tekst.trim()) return { ok: true, tekst: "" };
   const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
   const ctrl = new AbortController();
@@ -102,7 +105,7 @@ export async function oversaet({ tekst, fra = "da", til = "en", noegle, baseUrl 
     const svar = await fetchImpl(url, {
       method: "POST",
       headers: authHoveder(noegle, { "Content-Type": "application/json" }),
-      body: JSON.stringify({ model, messages: byggOversaettelsesPrompt(tekst, fra, til), temperature: 0 }),
+      body: JSON.stringify({ model, messages: byggOversaettelsesPrompt(tekst, fra, til, kontekst), temperature: 0 }),
       signal: ctrl.signal,
     });
     if (!svar.ok) return { ok: false, fejl: `MT HTTP ${svar.status}: ${(await svar.text()).slice(0, 160)}` };

@@ -24,7 +24,9 @@
           <option value="fil">Lydfil</option>
         </select>
       </label>
-      <label class="felt bred" id="enhedFelt"><span>Lydindgang</span>
+    </div>
+    <div class="raekke" id="enhedRaekke">
+      <label class="felt bred"><span>Lydindgang</span>
         <select id="enhedVaelger" class="vaelger"></select>
       </label>
       <button id="opdaterEnheder" class="knap sekundaer" title="Opdater enhedsliste">↻</button>
@@ -72,7 +74,24 @@
   </section>
 
   <section class="kort">
-    <h2>2 · API-nøgle og model</h2>
+    <h2>2 · API-nøgle, sprog og model</h2>
+    <div class="raekke">
+      <label class="felt"><span>Kildesprog</span>
+        <select id="kildeSprog" class="vaelger">
+          <option value="da">Dansk</option><option value="en">English</option>
+          <option value="de">Deutsch</option><option value="fr">Français</option>
+          <option value="es">Español</option><option value="it">Italiano</option>
+        </select>
+      </label>
+      <label class="felt"><span>Målsprog</span>
+        <select id="maalSprog" class="vaelger">
+          <option value="en">English</option><option value="da">Dansk</option>
+          <option value="de">Deutsch</option><option value="fr">Français</option>
+          <option value="es">Español</option><option value="it">Italiano</option>
+        </select>
+      </label>
+      <button id="byttSprog" class="knap sekundaer" title="Byt kildesprog og målsprog">⇄ Byt</button>
+    </div>
     <div id="noegleStatus" class="muted"></div>
     <div class="raekke">
       <input id="noegleFil" class="input" placeholder="Ingen nøglefil valgt" readonly />
