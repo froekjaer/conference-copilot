@@ -10,6 +10,7 @@ const T = {
   audioCtx: null, buffer: null, audioEl: null, blobUrl: null,
   sidsteSendt: 0, tikTimer: null, behandler: Promise.resolve(),
   blokke: 0, ord: 0, session: 0, forsinkelser: [], kontekst: "", blokTop: 0,
+  detektor: null, sidsteVis: 0,
 };
 
 const log = (tekst) => {
@@ -28,9 +29,34 @@ const saetStatus = (tekst, slags = "") => {
   p.className = "pille " + (slags === "live" ? "pille-live" : slags === "fejl" ? "pille-fejl" : "pille-off");
 };
 const debounce = (fn, ms = 250) => { let t = null; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const MIN_VIS_MS = 900;   // underteksten staar mindst saa laenge paa skaermen
 
 // Samme regel som i src/flow.js — rendereren kan ikke importere ES-moduler fra file://
 const erHallucination = (tekst) => /subscribe|amara\.org|thanks for watching|thank you for watching|undertekster af|subtitles by|www\.youtube|\.com\/channel/i.test(String(tekst || ""));
+
+// Taledetektor (spejler src/flow.js): holder styr paa lydens gulv, saa stilhed ikke sendes til API'et
+class TaleDetektor {
+  constructor(gulv = 0.004, faktor = 2.5, minimum = 0.009) {
+    this.gulv = gulv; this.faktor = faktor; this.minimum = minimum;
+  }
+  opdater(v) { const x = Number(v) || 0; if (x > 0) this.gulv = this.gulv * 0.9 + Math.min(x, this.gulv * 3) * 0.1; }
+  erTale(v) { return (Number(v) || 0) > Math.max(this.minimum, this.gulv * this.faktor); }
+}
+T.detektor = new TaleDetektor();
+
+/** RMS for en indspillet blok (WebM/Opus) — bruges til at afgoere, om der er tale. */
+async function rmsAfLyd(bytes, mime) {
+  try {
+    T.audioCtx = T.audioCtx || new AudioContext();
+    const buffer = await T.audioCtx.decodeAudioData(bytes.buffer.slice(0));
+    const data = buffer.getChannelData(0);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    return Math.sqrt(sum / (data.length || 1));
+  } catch {
+    return T.blokTop || 0;   // kan vi ikke afkode, brug niveauet fra analysatoren
+  }
+}
 
 // ---------------------------------------------------------------- skrifttyper
 function fyldSkrifttyper(liste) {
@@ -316,12 +342,13 @@ function behandlFilBlok() {
   if (slut - start < 0.4) return;
   const { bytes, rms } = wavFraUdsnit(T.buffer, start, slut);
   T.sidsteSendt = slut;
-  if (rms < 0.004) {
-    log(`[${fmtTid(start)}] stille blok sprunget over`);
+  if (!T.detektor.erTale(rms)) {
+    T.detektor.opdater(rms);
+    log(`[${fmtTid(start)}] stille blok sprunget over (rms ${rms.toFixed(3)})`);
     return;
   }
   const startet = performance.now();
-  koerBehandling(() => behandl(bytes, "audio/wav", fmtTid(start), startet, rms));
+  koerBehandling(() => behandl(bytes, "audio/wav", fmtTid(start), startet, rms, true));
 }
 
 // ---------------------------------------------------------------- fælles behandling
@@ -365,40 +392,47 @@ async function behandl(bytes, mime, tid, startet = performance.now(), niveauVaer
   if (stt.fallback) log(`tomt svar fra ${i.sttModel} — brugte whisper-1 i stedet`);
   if (minSession !== T.session) return;
   if (!stt.ok) throw new Error("transskription: " + stt.fejl);
-  const tekst = (stt.tekst || "").trim();
-  if (!tekst) return;
-
-  // Whisper kan finde paa at skrive "abonnér paa kanalen" paa stilhed — det skal ikke ud i salen
-  if (erHallucination(tekst) && (niveauVaerdi === null || niveauVaerdi < 0.02)) {
-    log(`[${tid}] kasseret hallucination: ${tekst.slice(0, 50)}`);
+  if (stt.usikker) {
+    // Behold den sidste gyldige undertekst — vis aldrig tomt eller opfundet tekst
+    log(`[${tid}] usikker blok kasseret (${stt.grund}) — forrige undertekst bliver staaende`);
     return;
   }
-
-  // 1) vis originalsproget med det samme — kortere oplevet ventetid
-  await window.copilot.overlay.tekst({ kilde: tekst, oversat: "…", tid });
-  $("kildeTekst").textContent = tekst;
+  const tekst = (stt.tekst || "").trim();
+  if (!tekst) return;
+  if (stt.fallback) log(`[${tid}] tomt svar — brugte whisper-1 i stedet`);
 
   const mt = await window.copilot.mt({ tekst, fra: i.kildeSprog, til: i.maalSprog, kontekst: T.kontekst || "" });
   if (minSession !== T.session) return;
-  const oversat = mt.ok ? mt.tekst : "";
-  if (!mt.ok) log("FEJL oversættelse: " + mt.fejl);
+  if (!mt.ok) {
+    log("FEJL oversættelse: " + mt.fejl);
+    return;   // rydder ikke den undertekst, der allerede staar
+  }
+  const oversat = (mt.tekst || "").trim();
+  if (!oversat) return;
 
+  // Foerst her udskiftes underteksten — og tidligst efter minimumsvisningstiden
+  const sidenSidst = performance.now() - (T.sidsteVis || 0);
+  if (T.sidsteVis && sidenSidst < MIN_VIS_MS) await new Promise((r) => setTimeout(r, MIN_VIS_MS - sidenSidst));
   await window.copilot.overlay.tekst({ kilde: tekst, oversat, tid });
+  T.sidsteVis = performance.now();
+
   await window.copilot.transskript.tilfoej({ kilde: tekst, oversat, tid });
 
   T.blokke += 1;
   T.ord += tekst.split(/\s+/).filter(Boolean).length;
   T.kontekst = (T.kontekst ? T.kontekst + " " : "") + tekst;
   if (T.kontekst.length > 240) T.kontekst = T.kontekst.slice(-240);
+  $("kildeTekst").textContent = tekst;
   $("oversatTekst").textContent = oversat;
   $("blokTal").textContent = `${T.blokke} blokke`;
   $("ordTal").textContent = `${T.ord} ord`;
 
   const ms = Math.round(performance.now() - startet);
+  const sttMs = stt.meta?.ms ?? 0;
   T.forsinkelser.push(ms);
   if (T.forsinkelser.length > 20) T.forsinkelser.shift();
   const gns = Math.round(T.forsinkelser.reduce((a, b) => a + b, 0) / T.forsinkelser.length);
-  $("forsinkelse").textContent = `forsinkelse: ${(ms / 1000).toFixed(1)} s (gns. ${(gns / 1000).toFixed(1)} s)`;
+  $("forsinkelse").textContent = `forsinkelse: ${(ms / 1000).toFixed(1)} s (STT ${sttMs} ms · gns. ${(gns / 1000).toFixed(1)} s)`;
   log(`${tid ? "[" + tid + "] " : ""}${tekst.slice(0, 70)}${tekst.length > 70 ? "…" : ""}`);
 }
 
@@ -428,9 +462,14 @@ async function startLive() {
     if (!e.data || e.data.size < 1200) return;
     const bytes = new Uint8Array(await e.data.arrayBuffer());
     const tid = fmtTid((Date.now() - start) / 1000);
-    const niveau = T.blokTop || 0;
+    const rmsV = await rmsAfLyd(bytes, mime);
     T.blokTop = 0;
-    koerBehandling(() => behandl(bytes, mime, tid, performance.now(), niveau));
+    if (!T.detektor.erTale(rmsV)) {
+      T.detektor.opdater(rmsV);
+      log(`[${tid}] stille blok sprunget over (rms ${rmsV.toFixed(3)})`);
+      return;
+    }
+    koerBehandling(() => behandl(bytes, mime, tid, performance.now(), rmsV, true));
   };
   T.recorder.onstop = () => log("Optagelse stoppet");
   T.recorder.start(chunk * 1000);
@@ -727,7 +766,11 @@ window.__testLydfil = async (sti, fraSek = 0) => {
   const slut = Math.min(start + chunk, T.buffer.duration);
   const { bytes, rms } = wavFraUdsnit(T.buffer, start, slut);
   const t0 = performance.now();
-  await behandl(bytes, "audio/wav", fmtTid(start));
+  if (!T.detektor.erTale(rms)) {
+    T.detektor.opdater(rms);
+    return { ok: true, stille: true, varighed: T.buffer.duration, blokSek: slut - start, rms: +rms.toFixed(4), ms: 0, blokke: T.blokke, ord: T.ord, kilde: "", oversat: "" };
+  }
+  await behandl(bytes, "audio/wav", fmtTid(start), t0, rms, true);
   return {
     ok: T.blokke > 0,
     varighed: T.buffer.duration,

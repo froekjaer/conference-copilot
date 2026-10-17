@@ -63,10 +63,12 @@ export function typografi(overlay = {}) {
     const n = Number(v);
     return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : std;
   };
-  const skrift = ["Segoe UI", "Arial", "Calibri", "Verdana", "Tahoma", "Georgia", "Times New Roman"];
+  const skriftFamilie = typeof overlay.skriftFamilie === "string" && overlay.skriftFamilie.trim()
+    ? overlay.skriftFamilie.trim().slice(0, 80)
+    : "Segoe UI";
   return {
     skriftStoerrelse: tal(overlay.skriftStoerrelse, 34, 12, 96),
-    skriftFamilie: skrift.includes(overlay.skriftFamilie) ? overlay.skriftFamilie : "Segoe UI",
+    skriftFamilie,
     tekstFarve: hex(overlay.tekstFarve, "#ffffff"),
     konturFarve: hex(overlay.konturFarve, "#000000"),
     konturPx: tal(overlay.konturPx, 2, 0, 8),

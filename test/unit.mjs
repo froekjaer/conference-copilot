@@ -12,7 +12,7 @@ import { presetGeometri, klamp, geometriFor, skaermNoegle, typografi, standardSt
 import { modellerFor, validerValg } from "../src/modeller.js";
 import { kodWav, udsnit } from "../src/wav.js";
 import { normaliserIndstillinger } from "../src/storage.js";
-import { normChunk, forventetForsinkelse, rms, erStille, erHallucination, skalProeveIgen } from "../src/flow.js";
+import { normChunk, forventetForsinkelse, rms, erStille, erHallucination, skalProeveIgen, fremmedSkrift, forkertSkrift, TaleDetektor } from "../src/flow.js";
 
 let ok = 0, alt = 0;
 const tjek = (navn, bestaaet, detalje = "") => {
@@ -209,10 +209,28 @@ try {
   tjek("flow: kendt hallucination genkendes", erHallucination("If you like this video, you can subscribe to the channel") === true);
   tjek("flow: almindelig dansk tekst er ikke hallucination", erHallucination("Der var engang en fattig kone") === false);
   tjek("flow: tom tekst er ikke hallucination", erHallucination("") === false);
-  tjek("retry: tomt svar paa tale proeves igen", skalProeveIgen("", 0.3, "gpt-4o-mini-transcribe") === true);
-  tjek("retry: tomt svar paa stilhed proeves ikke", skalProeveIgen("", 0.005, "gpt-4o-mini-transcribe") === false);
-  tjek("retry: svar med tekst proeves ikke", skalProeveIgen("hej", 0.4, "gpt-4o-mini-transcribe") === false);
-  tjek("retry: whisper-1 proeves ikke igen", skalProeveIgen("", 0.4, "whisper-1") === false);
+  tjek("retry: tomt svar paa tale proeves igen", skalProeveIgen("", true, "gpt-4o-mini-transcribe") === true);
+  tjek("retry: tomt svar paa stilhed proeves ikke", skalProeveIgen("", false, "gpt-4o-mini-transcribe") === false);
+  tjek("retry: svar med tekst proeves ikke", skalProeveIgen("hej", true, "gpt-4o-mini-transcribe") === false);
+  tjek("retry: whisper-1 proeves ikke igen", skalProeveIgen("", true, "whisper-1") === false);
+  tjek("retry: kun naar der er tale", skalProeveIgen("", false, "gpt-4o-mini-transcribe") === false);
+
+  // ---- sprogkontrol (kinesiske tegn i dansk tale skal ikke ud)
+  tjek("sprog: kinesiske tegn genkendes", fremmedSkrift("蘇國王的國王國王") === "kinesisk/japansk");
+  tjek("sprog: dansk tekst er ren", fremmedSkrift("Der var engang en fattig kone") === null);
+  tjek("sprog: engelske fagudtryk i dansk er tilladt", forkertSkrift("NIS2 og IEC 62443 gælder for OT og ICS", "da") === null);
+  tjek("sprog: kinesisk i dansk afvises", forkertSkrift("蘇國王", "da") === "kinesisk/japansk");
+  tjek("sprog: kinesisk er fint naar kilden er kinesisk", forkertSkrift("蘇國王", "zh") === null);
+  tjek("sprog: japansk hallucination kasseres", erHallucination("ご視聴ありがとうございました") === true);
+  tjek("sprog: dansk kanal-hallucination kasseres", erHallucination("Du kan abonnere på kanalen for flere videoer") === true);
+
+  // ---- taledetektor
+  const det = new TaleDetektor();
+  tjek("tale: stilhed afvises", det.erTale(0.003) === false);
+  tjek("tale: almindelig tale accepteres", det.erTale(0.05) === true);
+  const det2 = new TaleDetektor();
+  for (let i = 0; i < 20; i++) det2.opdater(0.004);
+  tjek("tale: stoejgulv haeves saa svag stoej ikke sendes", det2.erTale(0.006) === false && det2.erTale(0.05) === true);
 }
 
 console.log("");

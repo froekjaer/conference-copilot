@@ -66,6 +66,7 @@ export function byggSttForm(audioBuffer, mimeType = "audio/webm", { model = STAN
 /** Tale → tekst. Returnerer { ok, tekst, fejl }. */
 export async function transkriber({ audioBuffer, mimeType, noegle, baseUrl = STANDARD_BASE_URL, model = STANDARD_STT_MODEL, language = "", fetchImpl = fetch, timeoutMs = 60000 }) {
   if (!audioBuffer || audioBuffer.byteLength < 1200) return { ok: false, fejl: "for lidt lyd" };
+  const t0 = Date.now();
   const url = `${baseUrl.replace(/\/+$/, "")}/audio/transcriptions`;
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -73,7 +74,7 @@ export async function transkriber({ audioBuffer, mimeType, noegle, baseUrl = STA
     const svar = await fetchImpl(url, { method: "POST", headers: authHoveder(noegle), body: byggSttForm(audioBuffer, mimeType, { model, language }), signal: ctrl.signal });
     if (!svar.ok) return { ok: false, fejl: `STT HTTP ${svar.status}: ${(await svar.text()).slice(0, 160)}` };
     const j = await svar.json();
-    return { ok: true, tekst: String(j.text || "").trim() };
+    return { ok: true, tekst: String(j.text || "").trim(), meta: { model, language: language || "", bytes: audioBuffer.byteLength, ms: Date.now() - t0 } };
   } catch (e) {
     return { ok: false, fejl: beskrivFejl(e) };
   } finally {

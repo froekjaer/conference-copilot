@@ -16,7 +16,7 @@ import {
 } from "./storage.js";
 import { vaelgNoegle, laesNoegleFil } from "./noegle.js";
 import { geometriFor, presetGeometri, standardStoerrelse, skaermNoegle, klamp } from "./layout.js";
-import { skalProeveIgen } from "./flow.js";
+import { skalProeveIgen, forkertSkrift, erHallucination, beskrivSttKald } from "./flow.js";
 import { UDBYDERE, MODELLER, validerValg } from "./modeller.js";
 
 const SELFTEST = process.argv.includes("--selftest");
@@ -25,6 +25,8 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 const QUIT_TEST = process.argv.includes("--quit-test");
 const LYDFIL_TEST = (process.argv.find((a) => a.startsWith("--lydfil-test=")) || "").split("=")[1] || "";
 const STOP_TEST = (process.argv.find((a) => a.startsWith("--stop-test=")) || "").split("=")[1] || "";
+const STILLE_TEST = (process.argv.find((a) => a.startsWith("--stille-test=")) || "").split("=")[1] || "";
+const FONT_TEST = process.argv.includes("--font-test");
 const FRA_SEK = Number((process.argv.find((a) => a.startsWith("--fra=")) || "").split("=")[1] || 0);
 const TVANG_DEMO = process.argv.includes("--demo");
 const dataMappe = app.isPackaged ? join(dirname(process.execPath), "data") : join(app.getAppPath(), "data");
@@ -74,6 +76,8 @@ function opretKontrol() {
   if (SELFTEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerSelftest(), 1500));
   if (LYDFIL_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerLydfilTest(LYDFIL_TEST), 1500));
   if (STOP_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerStopTest(STOP_TEST), 1500));
+  if (STILLE_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerStilleTest(STILLE_TEST), 1500));
+  if (FONT_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerFontTest(), 1500));
   if (QUIT_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => { if (kontrolVindue) kontrolVindue.close(); }, 2500));
 }
 
@@ -317,26 +321,50 @@ ipcMain.handle("overlay:vis", svar(async (vis) => {
   return { synlig: Boolean(vis) };
 }));
 
-ipcMain.handle("stt:transcribe", svar(async ({ buffer, mimeType, language, niveau }) => {
+ipcMain.handle("stt:transcribe", svar(async ({ buffer, mimeType, language, niveau, harTale }) => {
   if (indstillinger.demo || TVANG_DEMO) return { tekst: demoTranksriber(demoSekvens++), demo: true };
   const n = hentNoegle();
   if (!n.noegle) throw new Error("ingen API-nøgle sat (Demo-tilstand kan bruges)");
+
+  const sprog = language || indstillinger.kildeSprog || "";
   const valg = {
     audioBuffer: Buffer.from(buffer), mimeType,
     noegle: n.noegle,
     baseUrl: indstillinger.baseUrl || STANDARD_BASE_URL,
     model: indstillinger.sttModel || STANDARD_STT_MODEL,
-    language: language || indstillinger.kildeSprog || "",
+    language: sprog,
   };
+
   const r = await transkriber(valg);
   if (!r.ok) throw new Error(r.fejl);
+  let tekst = r.tekst;
+  let meta = r.meta;
+  let fallback = "";
 
-  // Den hurtige model kan sjældent returnere tomt paa tale — saa proever vi én gang med whisper-1
-  if (skalProeveIgen(r.tekst, niveau, valg.model)) {
+  // 1) Tomt svar paa en blok med tale: ét forsoeg med whisper-1 — med samme sprog
+  if (skalProeveIgen(tekst, harTale, valg.model)) {
     const r2 = await transkriber({ ...valg, model: "whisper-1" });
-    if (r2.ok && r2.tekst.trim()) return { tekst: r2.tekst, fallback: "whisper-1" };
+    if (r2.ok && r2.tekst.trim() && !forkertSkrift(r2.tekst, sprog) && !erHallucination(r2.tekst)) {
+      tekst = r2.tekst;
+      meta = r2.meta;
+      fallback = "whisper-1";
+    }
   }
-  return { tekst: r.tekst };
+
+  // 2) Sprogligt forkert skriftsystem (fx kinesiske tegn i dansk tale) → usikker, vis ikke
+  const forkert = forkertSkrift(tekst, sprog);
+  if (forkert) {
+    console.log("STT usikker:", forkert, beskrivSttKald({ model: meta.model, language: meta.language, bytes: meta.bytes }));
+    return { tekst: "", usikker: true, grund: `forkert skriftsystem (${forkert})`, meta };
+  }
+
+  // 3) Kendte hallucinationer kasseres, uanset niveau
+  if (erHallucination(tekst)) {
+    console.log("STT kasseret hallucination:", tekst.slice(0, 60));
+    return { tekst: "", usikker: true, grund: "kendt hallucination", meta };
+  }
+
+  return { tekst, meta, fallback: fallback || undefined };
 }));
 
 ipcMain.handle("mt:translate", svar(async ({ tekst, fra, til, kontekst }) => {
@@ -487,6 +515,51 @@ async function koerStopTest(sti) {
   }
   writeFileSync(join(dataMappe, "stop-test.json"), JSON.stringify(rapport, null, 2), "utf8");
   console.log("STOPTEST " + JSON.stringify(rapport));
+  app.exit(rapport.trin.every((t) => t.ok) ? 0 : 1);
+}
+
+// ---------------------------------------------------------------- stille-test
+async function koerStilleTest(sti) {
+  const rapport = { tid: new Date().toISOString(), fil: sti, trin: [] };
+  const tilfoej = (navn, ok, detalje) => rapport.trin.push({ navn, ok, detalje: String(detalje ?? "").slice(0, 240) });
+  try {
+    const r = await kontrolVindue.webContents.executeJavaScript(`window.__testLydfil(${JSON.stringify(sti)}, 0)`);
+    tilfoej("stille blok sprunget over", r?.stille === true, `rms=${r?.rms}`);
+    tilfoej("ingen tekst sendt til overlay", (r?.kilde || "") === "" && (r?.oversat || "") === "", JSON.stringify({ kilde: r?.kilde, oversat: r?.oversat }));
+    tilfoej("ingen blokke behandlet", Number(r?.blokke) === 0, String(r?.blokke));
+  } catch (e) {
+    tilfoej("uventet-fejl", false, beskrivFejl(e));
+  }
+  writeFileSync(join(dataMappe, "stille-test.json"), JSON.stringify(rapport, null, 2), "utf8");
+  console.log("STILLETEST " + JSON.stringify(rapport));
+  app.exit(rapport.trin.every((t) => t.ok) ? 0 : 1);
+}
+
+// ---------------------------------------------------------------- font-test
+async function skiftFont(navn) {
+  indstillinger.overlay = normaliserIndstillinger({ ...indstillinger, overlay: { ...indstillinger.overlay, skriftFamilie: navn } }).overlay;
+  overlayVindue.webContents.send("overlay:config", overlayConfig());
+  overlayVindue.webContents.send("overlay:tekst", { kilde: "Skrifttypen er " + navn + ".", oversat: "This line is rendered in " + navn + ".", tid: "00:00" });
+  await new Promise((r) => setTimeout(r, 700));
+  return { navn, gemt: indstillinger.overlay.skriftFamilie, png: (await overlayVindue.webContents.capturePage()).toPNG() };
+}
+
+async function koerFontTest() {
+  const rapport = { tid: new Date().toISOString(), trin: [] };
+  const tilfoej = (navn, ok, detalje) => rapport.trin.push({ navn, ok, detalje: String(detalje ?? "").slice(0, 220) });
+  try {
+    const fonte = ["Georgia", "Consolas", "Segoe UI"];
+    const resultater = [];
+    for (const f of fonte) resultater.push(await skiftFont(f));
+    tilfoej("valget gemmes uaendret", resultater.every((r) => r.gemt === r.navn), resultater.map((r) => `${r.navn}→${r.gemt}`).join(", "));
+    const unikke = new Set(resultater.map((r) => r.png.length));
+    tilfoej("tre fonte giver tre forskellige billeder", unikke.size === 3, resultater.map((r) => `${r.navn}=${r.png.length}B`).join(", "));
+    fonte.forEach((f, i) => writeFileSync(join(dataMappe, `font-${i + 1}-${f.replace(/\s+/g, "")}.png`), resultater[i].png));
+  } catch (e) {
+    tilfoej("uventet-fejl", false, beskrivFejl(e));
+  }
+  writeFileSync(join(dataMappe, "font-test.json"), JSON.stringify(rapport, null, 2), "utf8");
+  console.log("FONTTEST " + JSON.stringify(rapport));
   app.exit(rapport.trin.every((t) => t.ok) ? 0 : 1);
 }
 

@@ -1,7 +1,32 @@
 # Funktioner, begrænsninger og testresultater
 
-**Version:** 0.2.3 · **Opdateret:** 17-10-2026
+**Version:** 0.3.0 · **Opdateret:** 17-10-2026
 Simulerede og virkelige tests er markeret hver for sig.
+
+## Rettelser i 0.3.0 — talegenkendelse og undertekster
+
+### Målt årsag til de forkerte sprog
+
+Transskriptionen sendte hele tiden `language=da` (verificeret i den faktiske request). Fejlen var, at **whisper-1 finder på tekst, når der ikke er tale** — og at 0.2.3'ens fallback sendte stille blokke videre til netop whisper-1.
+
+| Lyd | Model | Sprog | Svar |
+|---|---|---|---|
+| Stilhed | whisper-1 | da | "…abonnere på kanalen for at se flere videoer" |
+| Støj | whisper-1 | da | "Danske tekster af Amara.org familie" |
+| Støj | whisper-1 | ingen | **"ご視聴ありがとうございました"** |
+| Stilhed/støj | gpt-4o-mini-transcribe | da / ingen | tomt ✅ |
+
+### Rettelser
+
+| Rettelse | Effekt |
+|---|---|
+| **Taledetektor** med adaptivt støjgulv | stilhed og lydkortstøj når slet ikke API'et (målt: RMS 0,0016 → 0 kald) |
+| **Fallback strammet** | whisper-1 bruges kun ved faktisk tale, og svaret skal bestå sprog- og hallucinationskontrol |
+| **Sprogkontrol** | ikke-latinsk skrift i latinsk kildesprog kasseres som "usikker"; engelske fagudtryk og navne er stadig tilladt |
+| **Hallucinationsfilter** | kasserer de målte fraser (abonnere på kanalen, Amara.org, japanske afslutningsfraser) |
+| **Stabile undertekster** | ingen `...` på skærmen; forrige tekst bliver stående til et nyt gyldigt resultat; min. 0,9 s visningstid; fejl rydder intet |
+| **Skrifttype** | normaliseringen accepterede kun 7 faste fonte og erstattede alle andre med Segoe UI — nu gemmes og anvendes alle Windows-skrifttyper |
+| **Måling** | UI viser samlet forsinkelse, STT-tid og gennemsnit |
 
 ## Rettelser i 0.2.3
 
@@ -77,7 +102,9 @@ Rettet med en ordentlig lukkevej: når kontrolpanelet lukkes (eller appen afslut
 
 | Test | Type | Resultat |
 |---|---|---|
-| Unit-tests (`npm test`) | Simuleret | ✅ **73/73** — inkl. 4 nye for fallback-beslutningen |
+| Unit-tests (`npm test`) | Simuleret | ✅ **84/84** — inkl. sprogkontrol (kinesisk i dansk), taledetektor, fallback-beslutning og hallucinationer |
+| Stilhed og støj | **Virkelig** | ✅ **3/3 + 3/3** — 0 blokke, ingen API-kald, ingen tekst i overlay |
+| Skrifttyper (Georgia/Consolas/Segoe UI) | **Virkelig** | ✅ **2/2** — tre forskellige renders, valget gemmes uændret |
 | Intern selftest, udviklingsmiljø | **Virkelig** | ✅ **17/17** — inkl. 481 skrifttyper, 2 skærme, lydudgange, kontrolpanel- og overlay-render |
 | Stop-knap | **Virkelig** | ✅ **3/3** — afspilning starter, Stop stopper og nulstiller, knapperne skifter |
 | Lydfil-test gennem den rigtige UI | **Virkelig** | ✅ **4/4** — 4 s WAV afkodet, 1 blok behandlet, overlay-tekst vist, PNG gemt |

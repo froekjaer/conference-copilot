@@ -66,6 +66,8 @@ Ingen installation, ingen administratorrettigheder: pak ZIP-filen ud og kør `Co
 | Filen afspilles uden lyd | Vælg en lydudgang, eller tjek at enheden stadig er tilsluttet. |
 | Teksten klippes | Skru op for **Maks. linjer** eller for overlayets højde. |
 | For høj forsinkelse | Skru ned for **Lydblok** (2–4 s) og brug `gpt-4o-mini-transcribe` som transskriptionsmodel — den er målt ~30 % hurtigere end `whisper-1`. |
+| Underteksten skifter ikke i pauser | Korrekt: stilhed sendes ikke til API'et, og den sidste tekst bliver stående, til der er et nyt gyldigt resultat. |
+| Loggen siger "usikker blok kasseret" | API'et svarede med forkert skriftsystem eller en kendt hallucination — blokken blev kasseret, og den forrige undertekst blev bevaret. |
 
 ## 8. Sikkerhed og data
 
