@@ -107,7 +107,7 @@ export async function oversaet({ tekst, fra = "da", til = "en", noegle, baseUrl 
     });
     if (!svar.ok) return { ok: false, fejl: `MT HTTP ${svar.status}: ${(await svar.text()).slice(0, 160)}` };
     const j = await svar.json();
-    return { ok: true, tekst: String(j?.choices?.[0]?.message?.content || "").trim() };
+    return { ok: true, tekst: String(j?.choices?.[0]?.message?.content || "").trim(), brug: j?.usage || null };
   } catch (e) {
     return { ok: false, fejl: beskrivFejl(e) };
   } finally {

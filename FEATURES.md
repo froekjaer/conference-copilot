@@ -1,6 +1,6 @@
 # Funktioner, begrænsninger og testresultater
 
-**Version:** 0.1.0 · **Opdateret:** 16-10-2026
+**Version:** 0.1.1 · **Opdateret:** 17-10-2026
 Simulerede tests og virkelige tests er markeret hver for sig.
 
 ## Fungerende funktioner
@@ -25,8 +25,8 @@ Simulerede tests og virkelige tests er markeret hver for sig.
 | Unit-test af kerne (`npm test`) | Simuleret, ingen netværk | ✅ **25/25** — STT-form, svar-trimning, HTTP-fejl, netværksfejl, for-lidt-lyd, auth-header, oversættelse, prompt, genforsøg, transskript-format, fejltekster, demo, indstillinger, krypteret nøgle (inkl. at nøglen ikke står i klartekst) |
 | Intern selftest (`npm run selftest`) | **Virkelig** på denne maskine | ✅ **9/9** — vinduer oprettet, skærm fundet, lydenheder opregnet, **mikrofonoptagelse 1,5 s med niveaudetektion**, overlay-rendering (PNG 65 KB), transskriptskrivning, demo-STT, demo-MT, DPAPI tilgængelig |
 | Start fra udpakket ZIP | **Virkelig** | ✅ **9/9** — ZIP pakket ud i ren mappe, `ConferenceCoPilot.exe` startet derfra, `data/` oprettet ved siden af exe'en |
-| Transskription mod rigtigt API | Virkelig | ⏳ **ikke afprøvet** — der var ingen API-nøgle til rådighed under bygningen |
-| Oversættelse mod rigtigt API | Virkelig | ⏳ **ikke afprøvet** — samme grund |
+| Transskription mod rigtigt API | **Virkelig** | ✅ **bestået 17-10-2026** — LibriVox dansk (3:12) → dansk tekst på 11,7 s |
+| Oversættelse mod rigtigt API | **Virkelig** | ✅ **bestået** — 1.298 tokens, engelsk tekst på 5,1 s |
 | Overlay på sekundær skærm | Virkelig | ⏳ **ikke afprøvet** — testmaskinen har kun én skærm |
 | Nøgleskift i brugerfladen | Virkelig | ⏳ **ikke afprøvet** med en rigtig nøgle (kodevejen er unit-testet) |
 

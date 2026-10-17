@@ -39,6 +39,7 @@ Priser fra OpenAIs officielle prisliste (hentet 17-10-2026): Whisper **$0,006/mi
 - Billigere alternativ: `gpt-4o-mini-transcribe` i stedet for `whisper-1` → **≈ $0,20/time ≈ 1,4 kr.**
 - En 3-timers konference: ca. **$1,14** (whisper) eller **$0,60** (mini-transcribe).
 - Transskriptionen er 95 % af regningen; oversættelsen er støj i regnestykket.
+- **Målt i den rigtige test (17-10-2026):** 192,2 s lyd gav $0,0192 i transskription og $0,00045 i oversættelse — omregnet **≈ $0,37/time**, altså inden for 3 % af estimatet.
 - 600 kald/time = 10 kald/minut — inden for normale rate limits (fx 50 RPM).
 
 ## 4. Understøtter appen reelt både OpenAI og andre udbydere?
@@ -88,19 +89,32 @@ POST /v1/chat/completions
 Samme test med den rigtige LibriVox-fil: `filnavn=lyd.mp3`, `audio/mpeg`, 1.538.880 bytes ✓ — altså virker MP3-vejen også.
 Kæden gav overlay-PNG (104 KB). **4/4 trin OK.** Det beviser, at appen bygger korrekte HTTP-kald og læser svarene korrekt — men ikke at OpenAI svarer, og ikke kvaliteten på dansk tale.
 
-### Bevis 3 — rigtigt API-kald
-**Ikke gennemført endnu**, fordi der ikke var nogen API-nøgle på maskinen. Derfor er der **ikke** publiceret nye releases.
+### Bevis 3 — rigtigt API-kald ✅ **gennemført 17-10-2026**
 
-Klar til kørsel: testlyden er en **public domain**-optagelse (LibriVox, Grimms eventyr, 3:12, CC Public Domain-dedikation) hentet til `test/assets/dansk-librivox.mp3`.
+Testlyd: **public domain**-optagelse fra LibriVox (Grimms eventyr, 3:12, CC Public Domain-dedikation), `test/assets/dansk-librivox.mp3`.
+Nøglen blev læst fra en fil uden for repoet og sat kun i barneprocessens miljø; den optræder hverken i loggen, rapporten eller repoet.
 
-Nøglen læses fra en fil uden for repoet og sættes kun i barneprocessens miljø — den printes eller logges aldrig:
+| Trin | Resultat | Tid |
+|---|---|---|
+| Lydfil | 1.538.425 bytes, `audio/mpeg`, 192,2 s | — |
+| Transskription (`whisper-1`) | Dansk tekst, ~2.700 tegn | **11.732 ms** (≈16× realtid) |
+| Oversættelse (`gpt-4o-mini`) | Engelsk tekst, 740 input + 558 output tokens | **5.073 ms** |
+| Overlay | PNG 175 KB med begge tekster | **1.009 ms** |
+| **Hele kæden** | **4/4 trin OK** | **18.940 ms** |
+
+**Faktisk API-forbrug:** 3,203 minutter lyd × $0,006 = **$0,0192** (STT) + 1.298 tokens = **$0,00045** (MT) = **≈ $0,0197 pr. test** (~0,14 kr.).
+Omregnet til konferencedrift: **≈ $0,37/time**, hvilket bekræfter estimatet i afsnit 3.
+
+**Kvalitet:** transskriptionen var læsbar og sammenhængende; fejlene var koncentreret i egennavne og slutreplikker ("Grimseventyr" for "Grimms eventyr", "øger" for "gris", "Slutbo på rejse er brøderne grim" i stedet for afslutningsreplikken). Oversættelsen fulgte kilden trofast og oversatte ikke egennavne forkert videre.
+
+Bevisfiler i repoet: `docs/bevis-rigtig-uddrag.png` (overlayet), `docs/bevis-rigtig-overlay-raw.png` (den rå overlay-optagelse fra testen) og `docs/bevis-rigtig-test.json` (hele loggen uden hemmeligheder).
+
+Sådan genskabes det:
 
 ```powershell
 node test/koer-rigtig-test.mjs                 # laeser %USERPROFILE%\.cc-key.txt
 node test/koer-rigtig-test.mjs C:\sti\noegle.txt C:\sti\tale.mp3
 ```
-
-Resultat: `test/output/rigtig.json` (transskription, oversættelse, trin for trin) og `test/output/rigtig.png` (overlayet).
 
 ## Rettelser foretaget i denne gennemgang
 

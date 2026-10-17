@@ -1,0 +1,58 @@
+{
+  "tid": "2026-10-17T10:58:02.242Z",
+  "demo": false,
+  "lydFil": "C:\\Users\\passp\\AppData\\Roaming\\AutoClaw-oversea-official\\accounts\\84825a78f7a10b3155b3dd2c3d9c23a83ca097abef9d3a416cb08f8405fbb9c2\\projects\\Default\\conference-copilot\\test\\assets\\dansk-librivox.mp3",
+  "fra": "da",
+  "til": "en",
+  "apiVaert": "api.openai.com",
+  "modeller": {
+    "stt": "whisper-1",
+    "mt": "gpt-4o-mini"
+  },
+  "trin": [
+    {
+      "navn": "lydfil",
+      "ok": true,
+      "detalje": "1538425 bytes, audio/mpeg"
+    },
+    {
+      "navn": "transskription",
+      "ok": true,
+      "detalje": "Dette er en LibriVox-indspilning. Alle LibriVox-indspilninger er offentlig ejendom. For yderligere information, eller for at melde dig som frivillig, besøg LibriVox.org. På rejse fra Grimseventyr 1821, oversat af Carl Evald. Der var engang en flertal af Grimseventyrene i Grimseventyret. Der var engang en fattig kone, som havde én eneste søn. Han ville så gerne ud, men moderen sagde, Hvordan vil du"
+    },
+    {
+      "navn": "oversaettelse",
+      "ok": true,
+      "detalje": "This is a LibriVox recording. All LibriVox recordings are in the public domain. For more information, or to volunteer, visit LibriVox.org. On a journey from Grimms' Fairy Tales 1821, translated by Carl Evald. Once upon a time, there was a multitude of Grimms' fairy tales in Grimms' fairy tale. Once upon a time, there was a poor woman who had only one son. He wanted so much to go out, but the mothe"
+    },
+    {
+      "navn": "overlay-render",
+      "ok": true,
+      "detalje": "175272 bytes → C:\\Users\\passp\\AppData\\Roaming\\AutoClaw-oversea-official\\accounts\\84825a78f7a10b3155b3dd2c3d9c23a83ca097abef9d3a416cb08f8405fbb9c2\\projects\\Default\\conference-copilot\\test\\output\\rigtig.png"
+    }
+  ],
+  "lydVarighedSek": 192.182494,
+  "sttMs": 11732,
+  "mtMs": 5073,
+  "mtBrug": {
+    "prompt_tokens": 740,
+    "completion_tokens": 558,
+    "total_tokens": 1298,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "overlayMs": 1009,
+  "kilde": "Dette er en LibriVox-indspilning. Alle LibriVox-indspilninger er offentlig ejendom. For yderligere information, eller for at melde dig som frivillig, besøg LibriVox.org. På rejse fra Grimseventyr 1821, oversat af Carl Evald. Der var engang en flertal af Grimseventyrene i Grimseventyret. Der var engang en fattig kone, som havde én eneste søn. Han ville så gerne ud, men moderen sagde, Hvordan vil du bære dig ad med at rejse? Du kan jo ikke få en øger med? Jeg skal nok klare mig, lille mor, svarede han. Jeg siger bare hele tiden, ikke meget, ikke meget. Han gik så, mens han uophørligt sagde, ikke meget, ikke meget. En gang kom han forbi nogle fiskere og sagde også, Goddag, ikke meget, ikke meget. Hvad siger du, knægt? sagde de. Men da de træk deres garn op, var der ikke ret mange fisk i. En af dem tog sin stok og prylede løs på drengen. Hvad skal jeg da sige? spurgte han. Du skal sige, mange flere, mange flere, Du skal sige, mange flere, mange flere, svarede fiskeren. Han gik videre, og nogle tid efter kom han til en galge, hvor de var i færd med at hænge en stakkels fyr. Godmorgen, sagde drengen. Mange flere, mange flere. Hvad er det, du siger, din slemme knægt? råbte folk. Tror du, verden er fuld af onde mennesker? Er det ikke nok med den ene? Og så fik han igen på poklen. Hvad vil I da have, jeg skal sige? spurgte drengen. Du skal sige, Gud trøste den arme sjæl. Han gik videre og sagde hele tiden, Gud trøste den arme sjæl, Gud trøste den arme sjæl. Lidt efter kom han til en grøft, hvor der stod en rakker og flåede skinnet af en hest. Godmorgen, sagde drengen. Gud trøste den arme sjæl. Hvad er det, du siger, din tossede knægt? skreg manden og slog ham om ørerne med sin slagterkniv, så han hverken kunne høre eller se. Hvad skal jeg da sige? spurgte drengen. Du skal sige, I grøften med de ådsler. Så gik han hen ad vejen og mumlede hele tiden, I grøften med de ådsler. Lidt efter kom der en vogn fuld af folk forbi, og han sagde, Goddag, I grøften med de ådsler. I det samme rullede vognen ned i grøften, og kusken greb sin pisk og pryglede løs på drengen af alle kræfter. Så hængede han hjem til sin mor igen og drog aldrig mere på rejse. Slutbo på rejse er brøderne grim. Læst af Christoffer Hunsdal, Lydboge.com, 2009.",
+  "oversat": "This is a LibriVox recording. All LibriVox recordings are in the public domain. For more information, or to volunteer, visit LibriVox.org. On a journey from Grimms' Fairy Tales 1821, translated by Carl Evald. Once upon a time, there was a multitude of Grimms' fairy tales in Grimms' fairy tale. Once upon a time, there was a poor woman who had only one son. He wanted so much to go out, but the mother said, How will you manage to travel? You can't get a pig with you? I'll manage, little mother, he replied. I just keep saying, not much, not much. He went on, while constantly saying, not much, not much. One time he passed by some fishermen and also said, Good day, not much, not much. What are you saying, boy? they said. But when they pulled up their nets, there weren't many fish in them. One of them took his stick and beat the boy. What should I say then? he asked. You should say, many more, many more, You should say, many more, many more, replied the fisherman. He continued on, and some time later came to a gallows, where they were about to hang a poor fellow. Good morning, said the boy. Many more, many more. What is it you are saying, you naughty boy? shouted the people. Do you think the world is full of evil people? Isn't one enough? And then he got beaten again. What do you want me to say? asked the boy. You should say, God comfort the poor soul. He went on and kept saying, God comfort the poor soul, God comfort the poor soul. A little later he came to a ditch, where there was a knacker skinning a horse. Good morning, said the boy. God comfort the poor soul. What are you saying, you silly boy? screamed the man and hit him around the ears with his butcher's knife, so he could neither hear nor see. What should I say then? asked the boy. You should say, In the ditch with the carcasses. Then he walked along the road and kept mumbling, In the ditch with the carcasses. A little later, a cart full of people passed by, and he said, Good day, In the ditch with the carcasses. At that moment, the cart rolled into the ditch, and the driver grabbed his whip and beat the boy with all his might. Then he hung home to his mother again and never traveled again. The end of the journey is the Brothers Grimm. Read by Christoffer Hunsdal, Lydboge.com, 2009.",
+  "overlayKilde": "Slutbo på rejse er brøderne grim. Læst af Christoffer Hunsdal, Lydboge.com, 2009.",
+  "overlayOversat": "The end of the journey is the Brothers Grimm. Read by Christoffer Hunsdal, Lydboge.com, 2009.",
+  "samletMs": 18940
+}
