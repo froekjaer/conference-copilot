@@ -1,4 +1,4 @@
-﻿// Kerne-logik for Conference Co-Pilot: taleâ†’tekst, oversaettelse, transskript-linjer og genforsoeg.
+// Kerne-logik for Conference Co-Pilot: tale→tekst, oversaettelse, transskript-linjer og genforsoeg.
 // Rene funktioner uden Electron-afhaengigheder, saa de kan unit-testes i almindelig Node.
 // Hemmeligheder holdes i variabler (aldrig literaler) og skrives ikke til filer eller logs.
 
@@ -18,7 +18,7 @@ export function beskrivFejl(fejl) {
   if (!fejl) return "ukendt fejl";
   if (fejl.name === "AbortError") return "tidsgraense overskredet";
   const besked = String(fejl.message || fejl);
-  return besked.length > 200 ? besked.slice(0, 200) + "â€¦" : besked;
+  return besked.length > 200 ? besked.slice(0, 200) + "…" : besked;
 }
 
 export function erNetvaerksfejl(fejl) {
@@ -41,7 +41,7 @@ export async function medGenforsoeg(fn, { forsog = 3, baseMs = 600, sleep = (ms)
   throw sidste;
 }
 
-/** Filendelse ud fra MIME-type. Whisper accepterer mp3, mp4, mpga, m4a, wav, webm. */
+/** Filendelse og MIME ud fra lydformat. Whisper accepterer mp3, mp4, mpeg, mpga, m4a, wav, flac, ogg og webm. */
 export function endelseForMime(mimeType = "") {
   const m = String(mimeType).toLowerCase();
   if (m.includes("wav")) return { endelse: "wav", mime: "audio/wav" };
@@ -51,7 +51,6 @@ export function endelseForMime(mimeType = "") {
   if (m.includes("ogg") || m.includes("opus")) return { endelse: "ogg", mime: "audio/ogg" };
   return { endelse: "webm", mime: "audio/webm" };
 }
-
 
 /** Bygger multipart-body til et OpenAI-kompatibelt /audio/transcriptions-kald. */
 export function byggSttForm(audioBuffer, mimeType = "audio/webm", { model = STANDARD_STT_MODEL, language = "" } = {}) {
@@ -64,7 +63,7 @@ export function byggSttForm(audioBuffer, mimeType = "audio/webm", { model = STAN
   return form;
 }
 
-/** Tale â†’ tekst. Returnerer { ok, tekst, fejl }. */
+/** Tale → tekst. Returnerer { ok, tekst, fejl }. */
 export async function transkriber({ audioBuffer, mimeType, noegle, baseUrl = STANDARD_BASE_URL, model = STANDARD_STT_MODEL, language = "", fetchImpl = fetch, timeoutMs = 60000 }) {
   if (!audioBuffer || audioBuffer.byteLength < 1200) return { ok: false, fejl: "for lidt lyd" };
   const url = `${baseUrl.replace(/\/+$/, "")}/audio/transcriptions`;
@@ -93,7 +92,7 @@ export function byggOversaettelsesPrompt(tekst, fra, til) {
   ];
 }
 
-/** Tekst â†’ oversaettelse. Returnerer { ok, tekst, fejl }. */
+/** Tekst → oversaettelse. Returnerer { ok, tekst, fejl }. */
 export async function oversaet({ tekst, fra = "da", til = "en", noegle, baseUrl = STANDARD_BASE_URL, model = STANDARD_MT_MODEL, fetchImpl = fetch, timeoutMs = 20000 }) {
   if (!tekst || !tekst.trim()) return { ok: true, tekst: "" };
   const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
@@ -119,9 +118,9 @@ export async function oversaet({ tekst, fra = "da", til = "en", noegle, baseUrl 
 /** Demo/offline-tilstand: bruges til at teste hele kaeden uden API-noegle. */
 export function demoTranksriber(sekvens = 0) {
   const linjer = [
-    "Velkommen til konferencen. Vi starter om et Ã¸jeblik.",
+    "Velkommen til konferencen. Vi starter om et øjeblik.",
     "Dagens program handler om samarbejde mellem mennesker og maskiner.",
-    "Vi tager spÃ¸rgsmÃ¥l efter oplÃ¦gget.",
+    "Vi tager spørgsmål efter oplægget.",
     "Tak fordi I kom.",
   ];
   return linjer[sekvens % linjer.length];
@@ -129,15 +128,15 @@ export function demoTranksriber(sekvens = 0) {
 
 export function demoOversaet(tekst) {
   const tabel = {
-    "Velkommen til konferencen. Vi starter om et Ã¸jeblik.": "Welcome to the conference. We will begin in a moment.",
+    "Velkommen til konferencen. Vi starter om et øjeblik.": "Welcome to the conference. We will begin in a moment.",
     "Dagens program handler om samarbejde mellem mennesker og maskiner.": "Today's programme is about collaboration between humans and machines.",
-    "Vi tager spÃ¸rgsmÃ¥l efter oplÃ¦gget.": "We will take questions after the presentation.",
+    "Vi tager spørgsmål efter oplægget.": "We will take questions after the presentation.",
     "Tak fordi I kom.": "Thank you for coming.",
   };
   return tabel[tekst] || `[EN] ${tekst}`;
 }
 
-/** Tidsstempel til transskriptet (lokal tid, sekundoplÃ¸sning). */
+/** Tidsstempel til transskriptet (lokal tid, sekundopløsning). */
 export function tidsstempel(dato = new Date()) {
   const p = (n) => String(n).padStart(2, "0");
   return { klokke: `${p(dato.getHours())}:${p(dato.getMinutes())}:${p(dato.getSeconds())}`, iso: dato.toISOString() };
