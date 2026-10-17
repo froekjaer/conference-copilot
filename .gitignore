@@ -15,3 +15,7 @@ selftest-*.png
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Testartefakter fra integrationstesten
+test/output/
+test/assets/
