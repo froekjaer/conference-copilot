@@ -1,7 +1,28 @@
 # Funktioner, begrænsninger og testresultater
 
-**Version:** 0.2.1 · **Opdateret:** 17-10-2026
+**Version:** 0.2.2 · **Opdateret:** 17-10-2026
 Simulerede og virkelige tests er markeret hver for sig.
+
+## Rettelser og forbedringer i 0.2.2
+
+| Ændring | Detalje |
+|---|---|
+| **Kortere forsinkelse** | Standardblok 6 → **4 s**, kilde-teksten vises nu med det samme efter transskriptionen (før ventede den på oversættelsen), stille blokke springes over, og forsinkelsen måles og vises i UI'et |
+| **Hurtigere standardmodel** | `gpt-4o-mini-transcribe` i stedet for `whisper-1`: målt ~30 % hurtigere og halv pris ($0,003/min mod $0,006/min) — og den skriver ikke "abonnér på kanalen", når der er stille |
+| **Hallucinationsfilter** | Kendte Whisper-fraser (subscribe, amara.org, thanks for watching …) kasseres, hvis lyden er svag — de skal ikke ud i salen |
+| **Alle Windows-skrifttyper** | Skrifttypen vælges fra **481 installerede skrifttyper** hentet fra Windows-registret (maskin- og brugerniveau) i stedet for 7 faste |
+| **Stop virker** | Stop-knappen stoppede ikke afspilningen, fordi den kun blev aktiveret ved live-optagelse. Nu skifter Start/Stop korrekt, afspilningen stopper og stilles på 0, og svar undervejs forkastes |
+
+### Målinger (rigtig tale, samme netværk)
+
+| Blok | Behandlingstid (STT+MT) | Tekstkvalitet |
+|---|---|---|
+| 3 s | 1,7–2,3 s | ❗ kan skære "ikke" væk → betydningen vendes |
+| **4 s** | **2,5 s** | ✅ korrekt |
+| 5 s | 2,6 s | ✅ korrekt |
+| 6 s | 1,9–3,3 s | ✅ korrekt, men ~1 s mere ventetid |
+
+Samlet ventetid ≈ blok/2 + 2,3 s: **~5,3 s før** (6 s blok) mod **~4,3 s nu** (4 s blok) — og den danske originaltekst kommer ~1,5 s tidligere end før.
 
 ## Rettelser i 0.2.1
 
@@ -38,8 +59,9 @@ Rettet med en ordentlig lukkevej: når kontrolpanelet lukkes (eller appen afslut
 
 | Test | Type | Resultat |
 |---|---|---|
-| Unit-tests (`npm test`) | Simuleret | ✅ **58/58** — inkl. 20 nye for layout/presets/klamp, typografi-sanitering, modelvalidering, WAV-kodning og indstillinger v2-migrering |
-| Intern selftest, udviklingsmiljø | **Virkelig** | ✅ **16/16** — vinduer, **2 skærme**, presets, klamping, indstillinger v2, lydindgange, mikrofonoptagelse, **lydudgange**, overlay-render, **kontrolpanel-render**, **overlay på skærm 2**, transskript, DPAPI, modelvalidering |
+| Unit-tests (`npm test`) | Simuleret | ✅ **69/69** — inkl. 12 nye for blokstørrelse, forsinkelsesberegning, stilhed, hallucinationer og v3-migrering |
+| Intern selftest, udviklingsmiljø | **Virkelig** | ✅ **17/17** — inkl. 481 skrifttyper, 2 skærme, lydudgange, kontrolpanel- og overlay-render |
+| Stop-knap | **Virkelig** | ✅ **3/3** — afspilning starter, Stop stopper og nulstiller, knapperne skifter |
 | Lydfil-test gennem den rigtige UI | **Virkelig** | ✅ **4/4** — 4 s WAV afkodet, 1 blok behandlet, overlay-tekst vist, PNG gemt |
 | Rigtig API-kæde (LibriVox dansk 3:12) | **Virkelig** | ✅ **4/4** — STT 11,8 s, MT 4,9 s, 1.296 tokens, overlay renderet |
 | Overlay på sekundær skærm | **Virkelig** | ✅ skærm 2 fundet og brugt; overlay placeret inden for dens arbejdsområde og renderet (PNG 29 KB) |

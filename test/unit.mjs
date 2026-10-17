@@ -12,6 +12,7 @@ import { presetGeometri, klamp, geometriFor, skaermNoegle, typografi, standardSt
 import { modellerFor, validerValg } from "../src/modeller.js";
 import { kodWav, udsnit } from "../src/wav.js";
 import { normaliserIndstillinger } from "../src/storage.js";
+import { normChunk, forventetForsinkelse, rms, erStille, erHallucination } from "../src/flow.js";
 
 let ok = 0, alt = 0;
 const tjek = (navn, bestaaet, detalje = "") => {
@@ -183,13 +184,31 @@ try {
 // ---- indstillinger v2 og migrering
 {
   const v2 = normaliserIndstillinger({ provider: "demo", overlay: { skriftStoerrelse: 999, placering: { preset: "skæv", prSkarm: { "1@1920x1080": { x: 5, y: 6, width: 700, height: 180 } } } } });
-  tjek("indstillinger v2: demo-migrering", v2.demo === true && v2.provider === "openai" && v2.version === 2);
+  tjek("indstillinger v2: demo-migrering", v2.demo === true && v2.provider === "openai" && v2.version === 3);
+  tjek("indstillinger v3: whisper-1 migreres til hurtigere model", v2.sttModel === "gpt-4o-mini-transcribe", v2.sttModel);
+  const v3 = normaliserIndstillinger({ version: 3, sttModel: "whisper-1" });
+  tjek("indstillinger v3: bevidst valg af whisper-1 bevares", v3.sttModel === "whisper-1");
   tjek("indstillinger v2: typografi saniteres", v2.overlay.skriftStoerrelse === 96);
   tjek("indstillinger v2: ugyldigt preset falder tilbage", v2.overlay.placering.preset === "nederst");
   tjek("indstillinger v2: gemt skaermplacering bevares", v2.overlay.placering.prSkarm["1@1920x1080"].width === 700);
   const std = normaliserIndstillinger({});
   tjek("indstillinger v2: standard er hvid tekst med sort kontur", std.overlay.tekstFarve === "#ffffff" && std.overlay.konturFarve === "#000000" && std.overlay.konturPx === 2);
   tjek("indstillinger v2: standard er undertekst nederst", std.overlay.placering.preset === "nederst" && std.lydKilde === "mikrofon");
+}
+
+// ---- blokstørrelse, forsinkelse og stilhed
+{
+  tjek("flow: blok klem mes til 2-10 s", normChunk(1) === 2 && normChunk(99) === 10 && normChunk(3) === 3);
+  tjek("flow: ugyldig blok giver standard", normChunk("abc") === 4 && normChunk(null) === 4);
+  tjek("flow: forventet forsinkelse falder med kortere blokke", forventetForsinkelse(3) < forventetForsinkelse(6), `${forventetForsinkelse(3)} s mod ${forventetForsinkelse(6)} s`);
+  const stille = new Float32Array(1000).fill(0.0005);
+  const hoej = new Float32Array(1000).fill(0.2);
+  tjek("flow: stilhed genkendes", erStille(stille) === true && erStille(hoej) === false);
+  tjek("flow: rms af tom lyd er 0", rms(new Float32Array(0)) === 0);
+  tjek("flow: rms vokser med signalet", rms(hoej) > rms(stille));
+  tjek("flow: kendt hallucination genkendes", erHallucination("If you like this video, you can subscribe to the channel") === true);
+  tjek("flow: almindelig dansk tekst er ikke hallucination", erHallucination("Der var engang en fattig kone") === false);
+  tjek("flow: tom tekst er ikke hallucination", erHallucination("") === false);
 }
 
 console.log("");

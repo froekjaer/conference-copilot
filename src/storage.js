@@ -3,8 +3,9 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import { typografi } from "./layout.js";
+import { normChunk } from "./flow.js";
 
-export const INDSTILLINGER_VERSION = 2;
+export const INDSTILLINGER_VERSION = 3;
 
 export const STANDARD_OVERLAY = {
   skaermId: null,
@@ -31,11 +32,11 @@ export const STANDARD_INDSTILLINGER = {
   provider: "openai",
   demo: false,
   baseUrl: "https://api.openai.com/v1",
-  sttModel: "whisper-1",
+  sttModel: "gpt-4o-mini-transcribe",
   mtModel: "gpt-4o-mini",
   kildeSprog: "da",
   maalSprog: "en",
-  chunkSekunder: 6,
+  chunkSekunder: 4,
   noegleFil: "",
   egneModeller: [],
   lydKilde: "mikrofon",
@@ -57,6 +58,10 @@ export function normaliserIndstillinger(raa = {}) {
     } else if (j.provider === "api" || !j.provider) {
       j.provider = "openai";
     }
+  }
+  // v3: hurtigere og hallucinationssikker transskription som standard
+  if (!j.version || Number(j.version) < 3) {
+    if (!j.sttModel || j.sttModel === "whisper-1") j.sttModel = "gpt-4o-mini-transcribe";
   }
   const overlayRaa = { ...STANDARD_OVERLAY, ...(j.overlay || {}) };
   const placeringRaa = { ...(overlayRaa.placering || {}) };
@@ -83,7 +88,7 @@ export function normaliserIndstillinger(raa = {}) {
     ...j,
     version: INDSTILLINGER_VERSION,
     demo: Boolean(j.demo),
-    chunkSekunder: Math.min(Math.max(Number(j.chunkSekunder) || 6, 3), 20),
+    chunkSekunder: normChunk(j.chunkSekunder, 4),
     hastighed: [0.75, 1, 1.25].includes(Number(j.hastighed)) ? Number(j.hastighed) : 1,
     egneModeller: Array.isArray(j.egneModeller) ? j.egneModeller.filter((m) => m && m.id) : [],
     overlay,

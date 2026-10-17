@@ -20,7 +20,7 @@ Ingen installation, ingen administratorrettigheder: pak ZIP-filen ud og kør `Co
 
 ## 2. Lyd: mikrofon eller fil
 
-- **Mikrofon / lydkort** — live fra salen. Blokke på 6 s (kan ændres 3–20 s).
+- **Mikrofon / lydkort** — live fra salen. Blokke på 4 s som standard (kan ændres 2–10 s). Kortere blokke = kortere ventetid, men risiko for at et ord som "ikke" skæres midt over; 4 s er den bedste balance.
 - **Lydfil** — vælg WAV, MP3, M4A, FLAC, OGG eller WebM med **Vælg fil…**. Afspil, pause, stop, spol i tidslinjen og skift hastighed (0,75× / 1× / 1,25×). Filen sendes gennem **samme** transskriptions- og oversættelsespipeline som live-lyd — blok for blok, ikke hele filen på én gang. Tidsstemplerne følger filens position.
 - **Lydudgang** — vælg hvor filens lyd skal høres, eller **Ingen lydafspilning** (så behandles filen uden at sende lyd til højttalerne). Er enheden forsvundet, logger appen det og fortsætter uden lyd.
 
@@ -34,7 +34,7 @@ Ingen installation, ingen administratorrettigheder: pak ZIP-filen ud og kør `Co
 
 ## 4. Udseende
 
-- **Skrifttype**, **tekststørrelse** (12–96 px), **justering** (venstre/center/højre).
+- **Skrifttype** — alle installerede skrifttyper på maskinen kan vælges, **tekststørrelse** (12–96 px), **justering** (venstre/center/højre).
 - **Tekstfarve** og **konturfarve** med Windows-farvevælger, **kontur 0–8 px** (0 = ingen kontur), eller **skygge** i stedet.
 - **Baggrundsfarve** og **gennemsigtighed 0–100 %**.
 - **Maks. linjer** (1–6): teksten ombrydes og klippes pænt uden at flytte overlayet.
@@ -65,6 +65,7 @@ Ingen installation, ingen administratorrettigheder: pak ZIP-filen ud og kør `Co
 | Intet overlay på projektoren | Vælg den rigtige skærm under *3 · Overlay*, og tryk **Vis overlay**. |
 | Filen afspilles uden lyd | Vælg en lydudgang, eller tjek at enheden stadig er tilsluttet. |
 | Teksten klippes | Skru op for **Maks. linjer** eller for overlayets højde. |
+| For høj forsinkelse | Skru ned for **Lydblok** (2–4 s) og brug `gpt-4o-mini-transcribe` som transskriptionsmodel — den er målt ~30 % hurtigere end `whisper-1`. |
 
 ## 8. Sikkerhed og data
 

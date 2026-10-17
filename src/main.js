@@ -3,6 +3,7 @@
 // Alle fejl fanges, saa netvaerks- og lydfejl ikke braender appen ned.
 import { app, BrowserWindow, ipcMain, screen, safeStorage, dialog, shell } from "electron";
 import { join, dirname, basename } from "node:path";
+import { execFileSync } from "node:child_process";
 import { writeFileSync, appendFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import {
   transkriber, oversaet, demoTranksriber, demoOversaet,
@@ -20,6 +21,8 @@ import { UDBYDERE, MODELLER, validerValg } from "./modeller.js";
 const SELFTEST = process.argv.includes("--selftest");
 const QUIT_TEST = process.argv.includes("--quit-test");
 const LYDFIL_TEST = (process.argv.find((a) => a.startsWith("--lydfil-test=")) || "").split("=")[1] || "";
+const STOP_TEST = (process.argv.find((a) => a.startsWith("--stop-test=")) || "").split("=")[1] || "";
+const FRA_SEK = Number((process.argv.find((a) => a.startsWith("--fra=")) || "").split("=")[1] || 0);
 const TVANG_DEMO = process.argv.includes("--demo");
 const dataMappe = app.isPackaged ? join(dirname(process.execPath), "data") : join(app.getAppPath(), "data");
 const indstillingerFil = join(dataMappe, "indstillinger.json");
@@ -67,6 +70,7 @@ function opretKontrol() {
   });
   if (SELFTEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerSelftest(), 1500));
   if (LYDFIL_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerLydfilTest(LYDFIL_TEST), 1500));
+  if (STOP_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => koerStopTest(STOP_TEST), 1500));
   if (QUIT_TEST) kontrolVindue.webContents.on("did-finish-load", () => setTimeout(() => { if (kontrolVindue) kontrolVindue.close(); }, 2500));
 }
 
@@ -152,6 +156,32 @@ async function lukOverlay() {
   try { if (!v.isDestroyed()) v.destroy(); } catch { /* intet */ }
 }
 
+// ---------------------------------------------------------------- skrifttyper
+let skrifttyperCache = null;
+
+/** Alle installerede skrifttyper fra Windows-registret (bade maskin- og brugerniveau). */
+function laesSkrifttyper() {
+  if (skrifttyperCache) return skrifttyperCache;
+  const navne = new Set();
+  const noegler = [
+    "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts",
+    "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts",
+  ];
+  for (const n of noegler) {
+    try {
+      const ud = execFileSync("reg", ["query", n], { encoding: "latin1", timeout: 5000, windowsHide: true });
+      for (const linje of String(ud).split(/\r?\n/)) {
+        if (!/REG_(SZ|EXPAND_SZ)/i.test(linje)) continue;
+        const dele = linje.trim().split(/\s{2,}/);
+        const navn = (dele[0] || "").replace(/\s*\((TrueType|OpenType)\)\s*$/i, "").trim();
+        if (navn && !navn.startsWith("@")) navne.add(navn);
+      }
+    } catch { /* registret kan ikke laeses — spring over */ }
+  }
+  skrifttyperCache = [...navne].sort((a, b) => a.localeCompare(b, "da"));
+  return skrifttyperCache;
+}
+
 // ---------------------------------------------------------------- IPC
 const svar = (fn) => async (_evt, ...args) => {
   try { return { ok: true, ...(await fn(...args)) }; }
@@ -173,6 +203,8 @@ ipcMain.handle("displays", svar(async () => ({
     bounds: d.bounds, workArea: d.workArea, scaleFactor: d.scaleFactor,
   })),
 })));
+
+ipcMain.handle("skrifttyper", svar(async () => ({ skrifttyper: laesSkrifttyper() })));
 
 ipcMain.handle("settings:get", svar(async () => ({ indstillinger })));
 ipcMain.handle("settings:set", svar(async (del) => {
@@ -398,6 +430,8 @@ async function koerSelftest() {
     tilfoej("demo-mt", Boolean(demoOversaet(t)), demoOversaet(t));
     tilfoej("kryptering-tilgaengelig", krypto.tilgaengelig(), "safeStorage/DPAPI");
     tilfoej("modelvalidering", validerValg({ udbyderId: "openai", baseUrl: "https://api.openai.com/v1", sttModel: "whisper-1", mtModel: "gpt-4o-mini", egne: [] }).ok === true, "openai + whisper-1 + gpt-4o-mini");
+    const fonte = laesSkrifttyper();
+    tilfoej("skrifttyper", fonte.length > 15, `${fonte.length} fundet, fx ${fonte.slice(0, 3).join(", ")}`);
   } catch (e) {
     tilfoej("uventet-fejl", false, beskrivFejl(e));
   }
@@ -411,9 +445,9 @@ async function koerLydfilTest(sti) {
   const rapport = { tid: new Date().toISOString(), fil: sti, demo: true, trin: [] };
   const tilfoej = (navn, ok, detalje) => rapport.trin.push({ navn, ok, detalje: String(detalje ?? "").slice(0, 240) });
   try {
-    const r = await kontrolVindue.webContents.executeJavaScript(`window.__testLydfil(${JSON.stringify(sti)})`);
+    const r = await kontrolVindue.webContents.executeJavaScript(`window.__testLydfil(${JSON.stringify(sti)}, ${FRA_SEK})`);
     tilfoej("afkodning", Boolean(r?.ok) && r.varighed > 0, `${Number(r?.varighed || 0).toFixed(1)} s`);
-    tilfoej("blokke behandlet", Number(r?.blokke) > 0, `${r?.blokke} blokke, ${r?.ord} ord`);
+    tilfoej("blokke behandlet", Number(r?.blokke) > 0, `${r?.blokke} blokke, ${r?.ord} ord, ${r?.ms} ms for ${Number(r?.blokSek || 0).toFixed(1)} s lyd`);
     tilfoej("overlay-tekst", Boolean(r?.oversat), String(r?.oversat || "").slice(0, 90));
     await new Promise((res) => setTimeout(res, 700));
     const png = (await overlayVindue.webContents.capturePage()).toPNG();
@@ -424,6 +458,23 @@ async function koerLydfilTest(sti) {
   }
   writeFileSync(join(dataMappe, "lydfil-test.json"), JSON.stringify(rapport, null, 2), "utf8");
   console.log("LYDFILTEST " + JSON.stringify(rapport));
+  app.exit(rapport.trin.every((t) => t.ok) ? 0 : 1);
+}
+
+// ---------------------------------------------------------------- stop-test
+async function koerStopTest(sti) {
+  const rapport = { tid: new Date().toISOString(), fil: sti, trin: [] };
+  const tilfoej = (navn, ok, detalje) => rapport.trin.push({ navn, ok, detalje: String(detalje ?? "").slice(0, 240) });
+  try {
+    const r = await kontrolVindue.webContents.executeJavaScript(`window.__testStop(${JSON.stringify(sti)})`);
+    tilfoej("afspilning starter", r?.foer?.paused === false, JSON.stringify(r?.foer));
+    tilfoej("stop stopper afspilningen", r?.efter?.paused === true && r?.efter?.tid === 0, JSON.stringify(r?.efter));
+    tilfoej("knapperne skifter tilstand", r?.efter?.startKnapSlaaetFra === false && r?.efter?.stopKnapSlaaetFra === true, "start aktiv, stop inaktiv");
+  } catch (e) {
+    tilfoej("uventet-fejl", false, beskrivFejl(e));
+  }
+  writeFileSync(join(dataMappe, "stop-test.json"), JSON.stringify(rapport, null, 2), "utf8");
+  console.log("STOPTEST " + JSON.stringify(rapport));
   app.exit(rapport.trin.every((t) => t.ok) ? 0 : 1);
 }
 

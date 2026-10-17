@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld("copilot", {
   },
   filer: { laes: (sti) => kald("fil:laes", sti) },
   modeller: { hent: () => kald("modeller"), valider: (v) => kald("modeller:valider", v) },
+  skrifttyper: () => kald("skrifttyper"),
   overlay: {
     config: (d) => kald("overlay:config", d),
     tekst: (d) => kald("overlay:tekst", d),

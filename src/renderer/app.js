@@ -9,7 +9,7 @@ const T = {
   stream: null, recorder: null, optager: false, analyser: null, niveauTimer: null,
   audioCtx: null, buffer: null, audioEl: null, blobUrl: null,
   sidsteSendt: 0, tikTimer: null, behandler: Promise.resolve(),
-  blokke: 0, ord: 0,
+  blokke: 0, ord: 0, session: 0, forsinkelser: [],
 };
 
 const log = (tekst) => {
@@ -28,6 +28,23 @@ const saetStatus = (tekst, slags = "") => {
   p.className = "pille " + (slags === "live" ? "pille-live" : slags === "fejl" ? "pille-fejl" : "pille-off");
 };
 const debounce = (fn, ms = 250) => { let t = null; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+// Samme regel som i src/flow.js — rendereren kan ikke importere ES-moduler fra file://
+const erHallucination = (tekst) => /subscribe|amara\.org|thanks for watching|thank you for watching|undertekster af|subtitles by|www\.youtube|\.com\/channel/i.test(String(tekst || ""));
+
+// ---------------------------------------------------------------- skrifttyper
+function fyldSkrifttyper(liste) {
+  const sel = $("skriftFamilie");
+  const valgt = T.indstillinger?.overlay?.skriftFamilie || "Segoe UI";
+  sel.innerHTML = "";
+  const alle = [...new Set([valgt, "Segoe UI", "Arial", "Calibri", ...(liste || [])])];
+  alle.forEach((navn) => {
+    const o = document.createElement("option");
+    o.value = navn; o.textContent = navn;
+    sel.appendChild(o);
+  });
+  sel.value = alle.includes(valgt) ? valgt : alle[0];
+}
 
 // ---------------------------------------------------------------- indstillinger
 async function gem(del) {
@@ -210,7 +227,11 @@ async function indlaesLydFil(sti, navn) {
   T.blobUrl = URL.createObjectURL(new Blob([bytes]));
   if (!T.audioEl) {
     T.audioEl = new Audio();
-    T.audioEl.addEventListener("ended", () => { saetStatus("fil afspillet"); });
+    T.audioEl.addEventListener("ended", () => {
+      saetStatus("fil afspillet");
+      $("startKnap").disabled = false;
+      $("stopKnap").disabled = true;
+    });
     T.audioEl.addEventListener("timeupdate", opdaterTid);
   }
   T.audioEl.src = T.blobUrl;
@@ -246,6 +267,8 @@ async function afspilFil() {
   T.audioEl.playbackRate = Number($("hastighed").value) || 1;
   await T.audioEl.play();
   saetStatus("afspiller", "live");
+  $("startKnap").disabled = true;
+  $("stopKnap").disabled = false;
   if (!T.tikTimer) T.tikTimer = setInterval(tik, 250);
 }
 
@@ -253,22 +276,27 @@ function pauseFil() {
   if (!T.audioEl) return;
   T.audioEl.pause();
   saetStatus("pauset");
+  $("startKnap").disabled = false;
+  $("stopKnap").disabled = true;
 }
 
 function stopFil() {
   if (!T.audioEl) return;
+  T.session += 1;              // svar undervejs forkastes
   T.audioEl.pause();
   T.audioEl.currentTime = 0;
   T.sidsteSendt = 0;
   opdaterTid();
   saetStatus("stoppet");
+  $("startKnap").disabled = false;
+  $("stopKnap").disabled = true;
 }
 
 function tik() {
   if (!T.audioEl || !T.buffer) return;
   opdaterTid();
   const d = T.buffer.duration || 0;
-  const chunk = Number($("chunkSekunder").value) || 6;
+  const chunk = Number($("chunkSekunder").value) || 4;
   const nu = T.audioEl.currentTime;
 
   if (nu + 0.4 < T.sidsteSendt) T.sidsteSendt = nu;      // brugeren har spolet tilbage
@@ -280,13 +308,18 @@ function tik() {
 
 function behandlFilBlok() {
   if (!T.buffer) return;
-  const chunk = Number($("chunkSekunder").value) || 6;
+  const chunk = Number($("chunkSekunder").value) || 4;
   const start = T.sidsteSendt;
   const slut = Math.min(start + chunk, T.buffer.duration);
   if (slut - start < 0.4) return;
-  const { bytes } = wavFraUdsnit(T.buffer, start, slut);
+  const { bytes, rms } = wavFraUdsnit(T.buffer, start, slut);
   T.sidsteSendt = slut;
-  koerBehandling(() => behandl(bytes, "audio/wav", fmtTid(start)));
+  if (rms < 0.004) {
+    log(`[${fmtTid(start)}] stille blok sprunget over`);
+    return;
+  }
+  const startet = performance.now();
+  koerBehandling(() => behandl(bytes, "audio/wav", fmtTid(start), startet, rms));
 }
 
 // ---------------------------------------------------------------- fælles behandling
@@ -315,7 +348,7 @@ function wavFraUdsnit(buffer, startSek, slutSek) {
     v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
     off += 2;
   }
-  return { bytes: new Uint8Array(buf), varighedSek: antal / rate };
+  return { bytes: new Uint8Array(buf), varighedSek: antal / rate, rms: Math.sqrt(samples.reduce((a, v) => a + v * v, 0) / (antal || 1)) };
 }
 
 function koerBehandling(fn) {
@@ -323,14 +356,27 @@ function koerBehandling(fn) {
   return T.behandler;
 }
 
-async function behandl(bytes, mime, tid) {
+async function behandl(bytes, mime, tid, startet = performance.now(), rmsVaerdi = null) {
   const i = T.indstillinger;
+  const minSession = T.session;
   const stt = await window.copilot.stt({ buffer: bytes, mimeType: mime, language: i.kildeSprog });
+  if (minSession !== T.session) return;
   if (!stt.ok) throw new Error("transskription: " + stt.fejl);
   const tekst = (stt.tekst || "").trim();
   if (!tekst) return;
 
+  // Whisper kan finde paa at skrive "abonnér paa kanalen" paa stilhed — det skal ikke ud i salen
+  if (erHallucination(tekst) && (rmsVaerdi === null || rmsVaerdi < 0.02)) {
+    log(`[${tid}] kasseret hallucination: ${tekst.slice(0, 50)}`);
+    return;
+  }
+
+  // 1) vis originalsproget med det samme — kortere oplevet ventetid
+  await window.copilot.overlay.tekst({ kilde: tekst, oversat: "…", tid });
+  $("kildeTekst").textContent = tekst;
+
   const mt = await window.copilot.mt({ tekst, fra: i.kildeSprog, til: i.maalSprog });
+  if (minSession !== T.session) return;
   const oversat = mt.ok ? mt.tekst : "";
   if (!mt.ok) log("FEJL oversættelse: " + mt.fejl);
 
@@ -339,10 +385,15 @@ async function behandl(bytes, mime, tid) {
 
   T.blokke += 1;
   T.ord += tekst.split(/\s+/).filter(Boolean).length;
-  $("kildeTekst").textContent = tekst;
   $("oversatTekst").textContent = oversat;
   $("blokTal").textContent = `${T.blokke} blokke`;
   $("ordTal").textContent = `${T.ord} ord`;
+
+  const ms = Math.round(performance.now() - startet);
+  T.forsinkelser.push(ms);
+  if (T.forsinkelser.length > 20) T.forsinkelser.shift();
+  const gns = Math.round(T.forsinkelser.reduce((a, b) => a + b, 0) / T.forsinkelser.length);
+  $("forsinkelse").textContent = `forsinkelse: ${(ms / 1000).toFixed(1)} s (gns. ${(gns / 1000).toFixed(1)} s)`;
   log(`${tid ? "[" + tid + "] " : ""}${tekst.slice(0, 70)}${tekst.length > 70 ? "…" : ""}`);
 }
 
@@ -366,7 +417,7 @@ async function startLive() {
 
   const mime = "audio/webm";
   T.recorder = new MediaRecorder(T.stream, { mimeType: mime });
-  const chunk = Number($("chunkSekunder").value) || 6;
+  const chunk = Number($("chunkSekunder").value) || 4;
   const start = Date.now();
   T.recorder.ondataavailable = async (e) => {
     if (!e.data || e.data.size < 1200) return;
@@ -403,6 +454,7 @@ function startNiveau() {
 
 function stopLive(genstart = false) {
   T.optager = false;
+  T.session += 1;
   try { T.recorder?.state !== "inactive" && T.recorder?.stop(); } catch { /* intet */ }
   T.stream?.getTracks().forEach((t) => t.stop());
   T.stream = null;
@@ -447,6 +499,9 @@ async function indlaes() {
 
   const mo = await window.copilot.modeller.hent();
   T.udbydere = mo.udbydere; T.modeller = mo.modeller; T.egne = mo.egne || [];
+
+  const fonte = await window.copilot.skrifttyper();
+  fyldSkrifttyper(fonte.ok ? fonte.skrifttyper : []);
 
   fyldUdbydere();
   fyldModeller(false);
@@ -637,22 +692,39 @@ window.__selftestMikrofon = async () => {
 };
 
 // Bruges af main-processens --lydfil-test: indlæser filen og koerer én blok gennem samme kodevej som under afspilning.
-window.__testLydfil = async (sti) => {
+window.__testLydfil = async (sti, fraSek = 0) => {
   await indlaesLydFil(sti, String(sti).split(/[\\/]/).pop());
   if (!T.buffer) return { ok: false, fejl: "kunne ikke afkode lydfilen" };
-  T.sidsteSendt = 0;
-  const chunk = Number($("chunkSekunder").value) || 6;
-  const slut = Math.min(chunk, T.buffer.duration);
-  const { bytes } = wavFraUdsnit(T.buffer, 0, slut);
-  await behandl(bytes, "audio/wav", "00:00");
+  const start = Math.max(0, Number(fraSek) || 0);
+  const chunk = Number($("chunkSekunder").value) || 4;
+  const slut = Math.min(start + chunk, T.buffer.duration);
+  const { bytes, rms } = wavFraUdsnit(T.buffer, start, slut);
+  const t0 = performance.now();
+  await behandl(bytes, "audio/wav", fmtTid(start));
   return {
     ok: T.blokke > 0,
     varighed: T.buffer.duration,
+    blokSek: slut - start,
+    rms: +rms.toFixed(4),
+    ms: Math.round(performance.now() - t0),
     blokke: T.blokke,
     ord: T.ord,
     kilde: $("kildeTekst").textContent,
     oversat: $("oversatTekst").textContent,
   };
+};
+
+// Bruges af main-processens --stop-test: afspiller, klikker Stop og rapporterer tilstanden.
+window.__testStop = async (sti) => {
+  await indlaesLydFil(sti, String(sti).split(/[\\/]/).pop());
+  if (!T.buffer) return { ok: false, fejl: "kunne ikke afkode lydfilen" };
+  await afspilFil();
+  await new Promise((r) => setTimeout(r, 1200));
+  const foer = { paused: T.audioEl.paused, tid: T.audioEl.currentTime, stopKnapSlaaetFra: $("stopKnap").disabled };
+  stopFil();
+  await new Promise((r) => setTimeout(r, 400));
+  const efter = { paused: T.audioEl.paused, tid: T.audioEl.currentTime, startKnapSlaaetFra: $("startKnap").disabled, stopKnapSlaaetFra: $("stopKnap").disabled };
+  return { ok: foer.paused === false && efter.paused === true && efter.tid === 0, foer, efter };
 };
 
 indlaes().catch((e) => log("FEJL opstart: " + e.message));

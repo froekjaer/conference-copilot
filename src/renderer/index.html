@@ -58,7 +58,7 @@
         <select id="lydUdgang" class="vaelger"></select>
       </label>
       <label class="felt lille"><span>Lydblok</span>
-        <input id="chunkSekunder" class="input" type="number" min="3" max="20" value="6" />
+        <input id="chunkSekunder" class="input" type="number" min="2" max="10" value="4" />
       </label>
     </div>
 
@@ -66,6 +66,7 @@
       <button id="startKnap" class="knap primaer">▶ Start</button>
       <button id="stopKnap" class="knap" disabled>■ Stop</button>
       <span id="niveauTekst" class="muted">niveau: –</span>
+      <span id="forsinkelse" class="muted">forsinkelse: –</span>
     </div>
     <div id="lydStatus" class="muted"></div>
   </section>
@@ -145,10 +146,7 @@
     <h2>4 · Udseende</h2>
     <div class="raekke">
       <label class="felt"><span>Skrifttype</span>
-        <select id="skriftFamilie" class="vaelger">
-          <option>Segoe UI</option><option>Arial</option><option>Calibri</option>
-          <option>Verdana</option><option>Tahoma</option><option>Georgia</option><option>Times New Roman</option>
-        </select>
+        <select id="skriftFamilie" class="vaelger"></select>
       </label>
       <label class="felt"><span>Tekststørrelse <b id="fontVaerdi">34</b> px</span>
         <input id="fontStoerrelse" type="range" min="12" max="96" value="34" />

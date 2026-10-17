@@ -3,7 +3,7 @@
 // Hemmeligheder holdes i variabler (aldrig literaler) og skrives ikke til filer eller logs.
 
 export const STANDARD_BASE_URL = "https://api.openai.com/v1";
-export const STANDARD_STT_MODEL = "whisper-1";
+export const STANDARD_STT_MODEL = "gpt-4o-mini-transcribe";
 export const STANDARD_MT_MODEL = "gpt-4o-mini";
 
 /** Bygger auth-headere uden at noeglen nogensinde indgaa i en log eller fil. */
