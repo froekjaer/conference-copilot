@@ -142,12 +142,13 @@ export function tidsstempel(dato = new Date()) {
   return { klokke: `${p(dato.getHours())}:${p(dato.getMinutes())}:${p(dato.getSeconds())}`, iso: dato.toISOString() };
 }
 
-export function byggTranskriptLinje({ kilde, oversat, fra, til, dato }) {
+export function byggTranskriptLinje({ kilde, oversat, fra, til, dato, tid }) {
   const t = tidsstempel(dato);
-  return `[${t.klokke}] ${fra.toUpperCase()}: ${kilde}\n[${t.klokke}] ${til.toUpperCase()}: ${oversat}\n`;
+  const k = tid || t.klokke;
+  return `[${k}] ${fra.toUpperCase()}: ${kilde}\n[${k}] ${til.toUpperCase()}: ${oversat}\n`;
 }
 
-export function byggTranskriptJson({ kilde, oversat, fra, til, dato }) {
+export function byggTranskriptJson({ kilde, oversat, fra, til, dato, tid }) {
   const t = tidsstempel(dato);
-  return JSON.stringify({ ts: t.iso, klokke: t.klokke, fra, til, kilde, oversat }) + "\n";
+  return JSON.stringify({ ts: t.iso, klokke: tid || t.klokke, fra, til, kilde, oversat }) + "\n";
 }

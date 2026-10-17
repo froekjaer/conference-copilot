@@ -1,32 +1,92 @@
-:root { color-scheme: dark; }
+:root {
+  --bg: #12151c;
+  --kort: #1a1f29;
+  --kort2: #212836;
+  --linje: #2c3546;
+  --tekst: #e8edf6;
+  --muted: #98a3b6;
+  --accent: #4da3ff;
+  --groen: #35c47a;
+  --roed: #ff6b6b;
+}
 * { box-sizing: border-box; }
-body { margin: 0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; background: #12151c; color: #e8ecf3; }
-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #232a36; position: sticky; top: 0; background: #12151c; z-index: 5; }
-h1 { font-size: 17px; margin: 0; font-weight: 600; }
-h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .06em; color: #8fa1bb; }
-main { padding: 14px 18px 28px; display: grid; gap: 14px; grid-template-columns: 1fr; }
-.kort { background: #171b24; border: 1px solid #232a36; border-radius: 10px; padding: 14px; }
-.raekke { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--tekst); }
+body { font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 22px; border-bottom: 1px solid var(--linje);
+  position: sticky; top: 0; background: var(--bg); z-index: 5;
+}
+.titel { display: flex; align-items: baseline; gap: 10px; }
+h1 { font-size: 17px; margin: 0; letter-spacing: 0.2px; }
+
+.pille { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--linje); }
+.pille-off { color: var(--muted); }
+.pille-live { color: #0b1a12; background: var(--groen); border-color: transparent; font-weight: 600; }
+.pille-fejl { color: #2a0d0d; background: var(--roed); border-color: transparent; font-weight: 600; }
+
+main { padding: 18px 22px 40px; display: grid; gap: 16px; max-width: 1040px; margin: 0 auto; }
+
+.kort { background: var(--kort); border: 1px solid var(--linje); border-radius: 12px; padding: 14px 16px 16px; }
+.kort h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+
+.raekke { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
 .raekke:last-child { margin-bottom: 0; }
-.felt { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #9fb0c8; }
-.felt.bred { flex: 1 1 100%; }
-.felt b { color: #e8ecf3; }
-.vaelger, .input, input[type="number"] { background: #10141b; color: #e8ecf3; border: 1px solid #2b3444; border-radius: 8px; padding: 8px 10px; min-width: 160px; }
-input[type="range"] { width: 190px; }
-.knap { background: #232c3b; color: #e8ecf3; border: 1px solid #334054; border-radius: 8px; padding: 9px 14px; cursor: pointer; }
-.knap:hover { background: #2b3648; }
-.knap.primaer { background: #1f6feb; border-color: #2b7bf5; }
-.knap.primaer:hover { background: #2a7cf7; }
-.knap:disabled { opacity: .45; cursor: default; }
-.sekundaer { background: #1b2230; }
-.pille { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #334054; }
-.pille-off { color: #9fb0c8; }
-.pille-live { background: #17361f; border-color: #2e7d45; color: #a8f0bf; }
-.pille-fejl { background: #3a1d1d; border-color: #a33; color: #ffc2c2; }
-.muted { color: #8fa1bb; font-size: 12px; }
-.afkrydsning { display: flex; gap: 8px; align-items: center; font-size: 13px; color: #c7d3e4; }
-.live { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
-.live-blok { background: #10141b; border: 1px solid #232a36; border-radius: 8px; padding: 10px; min-height: 78px; }
-.live-tekst { margin-top: 6px; font-size: 15px; }
-.log { background: #0d1117; border: 1px solid #232a36; border-radius: 8px; padding: 8px 10px; max-height: 190px; overflow: auto; font: 12px/1.5 Consolas, monospace; color: #9fb0c8; }
-.log div { white-space: pre-wrap; }
+
+.felt { display: flex; flex-direction: column; gap: 4px; min-width: 150px; flex: 0 1 auto; }
+.felt.bred { flex: 1 1 260px; }
+.felt.lille { min-width: 104px; flex: 0 0 auto; }
+.felt > span { font-size: 12px; color: var(--muted); }
+.felt b { color: var(--tekst); font-weight: 600; }
+
+.input, .vaelger {
+  background: var(--kort2); color: var(--tekst);
+  border: 1px solid var(--linje); border-radius: 8px;
+  padding: 8px 10px; font: inherit; min-height: 36px;
+}
+.input:focus, .vaelger:focus { outline: 2px solid rgba(77, 163, 255, 0.45); outline-offset: 1px; }
+.input[readonly] { color: var(--muted); }
+.soeg { flex: 1 1 160px; min-width: 120px; }
+
+.knap {
+  background: var(--kort2); color: var(--tekst);
+  border: 1px solid var(--linje); border-radius: 8px;
+  padding: 8px 14px; font: inherit; cursor: pointer; min-height: 36px;
+}
+.knap:hover { border-color: #3d4a61; }
+.knap:disabled { opacity: 0.45; cursor: default; }
+.knap.primaer { background: var(--accent); color: #06101d; border-color: transparent; font-weight: 600; }
+.knap.sekundaer { background: transparent; }
+.knapgruppe { display: flex; gap: 6px; }
+.knapgruppe .knap { padding: 6px 10px; min-height: 32px; font-size: 13px; }
+.knapgruppe .knap.aktiv { border-color: var(--accent); color: var(--accent); }
+
+.afkrydsning { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+.afkrydsning input { accent-color: var(--accent); }
+
+.farvet { width: 46px; height: 36px; padding: 2px; background: var(--kort2); border: 1px solid var(--linje); border-radius: 8px; }
+
+.muted { color: var(--muted); font-size: 13px; }
+.mono { font-variant-numeric: tabular-nums; font-family: Consolas, monospace; }
+
+.transport { align-items: center; }
+
+.toertekst { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.kolonne { min-width: 0; }
+.etikette { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.tekstboks {
+  background: var(--kort2); border: 1px solid var(--linje); border-radius: 8px;
+  padding: 10px 12px; min-height: 74px; max-height: 160px; overflow: auto;
+  font-size: 14px; white-space: pre-wrap; word-break: break-word;
+}
+
+.log {
+  background: #0d1017; border: 1px solid var(--linje); border-radius: 8px;
+  padding: 10px; margin: 10px 0 0; height: 130px; overflow: auto;
+  font: 12px/1.45 Consolas, monospace; color: #a9b6cb; white-space: pre-wrap;
+}
+
+@media (max-width: 860px) {
+  .toertekst { grid-template-columns: 1fr; }
+}

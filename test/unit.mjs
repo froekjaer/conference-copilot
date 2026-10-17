@@ -8,6 +8,10 @@ import {
 } from "../src/pipeline.js";
 import { laesIndstillinger, gemIndstillinger, gemHemmelighed, laesHemmelighed, sletHemmelighed } from "../src/storage.js";
 import { laesNoegleFil, vaelgNoegle } from "../src/noegle.js";
+import { presetGeometri, klamp, geometriFor, skaermNoegle, typografi, standardStoerrelse } from "../src/layout.js";
+import { modellerFor, validerValg } from "../src/modeller.js";
+import { kodWav, udsnit } from "../src/wav.js";
+import { normaliserIndstillinger } from "../src/storage.js";
 
 let ok = 0, alt = 0;
 const tjek = (navn, bestaaet, detalje = "") => {
@@ -125,6 +129,67 @@ try {
   } finally {
     rmSync(mappe2, { recursive: true, force: true });
   }
+}
+
+// ---- layout: presets, klampning, placering pr. skaerm
+{
+  const wa = { x: 0, y: 0, width: 1920, height: 1040 };
+  const o = presetGeometri(wa, "øverst", 1200, 220);
+  const m = presetGeometri(wa, "midten", 1200, 220);
+  const n = presetGeometri(wa, "nederst", 1200, 220);
+  tjek("layout: presets giver tre forskellige placeringer", o.y < m.y && m.y < n.y, `${o.y}/${m.y}/${n.y}`);
+  tjek("layout: presets holder sig inde paa skaermen", [o, m, n].every((g) => g.x >= 0 && g.y >= 0 && g.y + g.height <= wa.height));
+  const k = klamp({ x: -900, y: 5000, width: 100, height: 50 }, wa);
+  tjek("layout: klamp holder vinduet inde og over minimum", k.x >= 0 && k.y + k.height <= wa.height && k.width >= 320 && k.height >= 100, JSON.stringify(k));
+  const skaerm = { id: 7, bounds: { width: 1920, height: 1080 }, workArea: wa };
+  const g1 = geometriFor(skaerm, { placering: { preset: "nederst", prSkarm: { [skaermNoegle(skaerm)]: { x: 10, y: 20, width: 800, height: 200 } } } });
+  tjek("layout: gemt placering pr. skaerm bruges", g1.x === 10 && g1.y === 20 && g1.width === 800);
+  const g2 = geometriFor(skaerm, { placering: { preset: "øverst", prSkarm: {} } });
+  tjek("layout: uden gemt placering bruges preset", g2.y === wa.y + 24);
+  const tp = typografi({ skriftStoerrelse: 999, tekstFarve: "blå", konturPx: -3, justering: "skæv", maxLinjer: 99 });
+  tjek("layout: typografi saniteres", tp.skriftStoerrelse === 96 && tp.tekstFarve === "#ffffff" && tp.konturPx === 0 && tp.justering === "left" && tp.maxLinjer === 6, JSON.stringify(tp));
+}
+
+// ---- modeller og validering
+{
+  const stt = modellerFor("openai", "stt", []).map((m) => m.id);
+  tjek("modeller: openai-stt indeholder whisper-1", stt.includes("whisper-1") && !stt.includes("gpt-4o-mini"));
+  const mtGroq = modellerFor("groq", "mt", []).map((m) => m.id);
+  tjek("modeller: groq-mt indeholder llama", mtGroq.includes("llama-3.3-70b-versatile"));
+  const egne = modellerFor("openai", "stt", [{ id: "min-model", anvendelse: "stt" }]).map((m) => m.id);
+  tjek("modeller: egen model medtages", egne.includes("min-model"));
+  tjek("validering: kendt kombination er ok", validerValg({ udbyderId: "openai", baseUrl: "https://api.openai.com/v1", sttModel: "whisper-1", mtModel: "gpt-4o-mini" }).ok === true);
+  tjek("validering: ukendt model afvises", validerValg({ udbyderId: "openai", baseUrl: "https://api.openai.com/v1", sttModel: "findes-ikke", mtModel: "gpt-4o-mini" }).ok === false);
+  tjek("validering: ugyldig URL afvises", validerValg({ udbyderId: "openai", baseUrl: "api.openai.com", sttModel: "whisper-1", mtModel: "gpt-4o-mini" }).ok === false);
+}
+
+// ---- WAV-kodning og udsnit
+{
+  const samples = new Float32Array(1600);
+  for (let i = 0; i < samples.length; i++) samples[i] = Math.sin((2 * Math.PI * 440 * i) / 16000) * 0.5;
+  const wav = kodWav(samples, 16000, 1);
+  const tekst = Buffer.from(wav.slice(0, 4)).toString("ascii") + Buffer.from(wav.slice(8, 12)).toString("ascii");
+  tjek("wav: RIFF/WAVE-header", tekst === "RIFFWAVE");
+  tjek("wav: laengde svarer til 16-bit mono", wav.length === 44 + samples.length * 2, `${wav.length}`);
+  const dataLen = new DataView(wav.buffer, wav.byteOffset).getUint32(40, true);
+  tjek("wav: datalaengde i headeren er korrekt", dataLen === samples.length * 2);
+
+  const buffer = { sampleRate: 16000, numberOfChannels: 1, length: 32000, getChannelData: () => new Float32Array(32000).fill(0.25) };
+  tjek("udsnit: klipper det rigtige antal samples", udsnit(buffer, 0.5, 1.5).length === 16000);
+  tjek("udsnit: klamper til filens laengde", udsnit(buffer, 1.5, 5).length === 8000);
+  tjek("udsnit: tomt interval giver tomt resultat", udsnit(buffer, 2, 1).length === 0);
+}
+
+// ---- indstillinger v2 og migrering
+{
+  const v2 = normaliserIndstillinger({ provider: "demo", overlay: { skriftStoerrelse: 999, placering: { preset: "skæv", prSkarm: { "1@1920x1080": { x: 5, y: 6, width: 700, height: 180 } } } } });
+  tjek("indstillinger v2: demo-migrering", v2.demo === true && v2.provider === "openai" && v2.version === 2);
+  tjek("indstillinger v2: typografi saniteres", v2.overlay.skriftStoerrelse === 96);
+  tjek("indstillinger v2: ugyldigt preset falder tilbage", v2.overlay.placering.preset === "nederst");
+  tjek("indstillinger v2: gemt skaermplacering bevares", v2.overlay.placering.prSkarm["1@1920x1080"].width === 700);
+  const std = normaliserIndstillinger({});
+  tjek("indstillinger v2: standard er hvid tekst med sort kontur", std.overlay.tekstFarve === "#ffffff" && std.overlay.konturFarve === "#000000" && std.overlay.konturPx === 2);
+  tjek("indstillinger v2: standard er undertekst nederst", std.overlay.placering.preset === "nederst" && std.lydKilde === "mikrofon");
 }
 
 console.log("");
