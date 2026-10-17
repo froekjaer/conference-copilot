@@ -11,6 +11,7 @@ Ingen installation, ingen administratorrettigheder: pak ZIP-filen ud og kør `Co
 2. Dobbeltklik **`ConferenceCoPilot.exe`**. Kontrolpanelet åbner, og et gennemsigtigt overlay vises nederst på skærmen.
 3. Vælg **lydindgang** i feltet *1 · Lydindgang* — fx dit USB-lydkort eller AV-mixeren. Tryk ↻ hvis listen er tom.
 4. Indsæt **API-nøglen** i feltet *2 · API-nøgle og model* og tryk **Gem**. Nøglen gemmes krypteret med Windows DPAPI (kun din Windows-bruger kan læse den).
+   **Nemmere:** skriv stien til en nøglefil du allerede har — fx `C:\Users\dig\.cc-key.txt` — i feltet nedenunder og tryk **Brug fil**. Appen læser nøglen derfra ved hvert kald og viser kun stien, aldrig nøglen. **Ryd** fjerner valget igen.
    *Vil du prøve uden nøgle?* Sæt flueben i **Demo-tilstand** — så kører hele kæden med eksempeltekst (ingen API-kald).
 5. Tryk **Test forbindelse** for at bekræfte nøglen.
 6. Vælg **kildesprog** (fx Dansk) og **målsprog** (fx English).
@@ -46,6 +47,7 @@ Appen stopper aldrig ved netværksfejl: den logger fejlen i vinduet og fortsætt
 
 ## 5. Sikkerhed og data
 
+- **Nøglekilder i prioriteret rækkefølge:** miljøvariablen `CO_PILOT_API_KEY` → **nøglefil** (den sti du peger på) → **DPAPI** (den nøgle du har gemt i UI'en). Den aktive kilde står i feltet under knapperne — kun kilden og filstien, aldrig nøglen.
 - **API-nøglen** gemmes udelukkende krypteret i `data\hemmelighed.bin` (Windows DPAPI, bundet til din bruger). Den skrives aldrig i logs eller transskriptioner.
 - Du kan i stedet sætte nøglen som miljøvariablen `CO_PILOT_API_KEY` før start — så gemmes den slet ikke på disk.
 - Ingen telemetri. Ingen automatisk upload af lyd eller tekster. Lyden sendes kun til den API-udbyder, du selv har konfigureret, og kun i de korte blokke der skal transskriberes.

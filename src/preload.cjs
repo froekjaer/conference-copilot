@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld("copilot", {
   info: () => kald("info"),
   displays: () => kald("displays"),
   settings: { hent: () => kald("settings:get"), gem: (d) => kald("settings:set", d) },
-  secrets: { status: () => kald("secrets:status"), gem: (n) => kald("secrets:set", n), slet: () => kald("secrets:clear") },
+  secrets: { status: () => kald("secrets:status"), gem: (n) => kald("secrets:set", n), slet: () => kald("secrets:clear"), proevFil: (sti) => kald("secrets:proev-fil", sti) },
   overlay: {
     config: (d) => kald("overlay:config", d),
     tekst: (d) => kald("overlay:tekst", d),

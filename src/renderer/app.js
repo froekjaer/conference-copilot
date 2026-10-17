@@ -175,6 +175,7 @@ async function indlaesAlt() {
   $("baseUrl").value = i.baseUrl; $("sttModel").value = i.sttModel; $("mtModel").value = i.mtModel;
   $("kildeSprog").value = i.kildeSprog; $("maalSprog").value = i.maalSprog;
   $("chunkSekunder").value = i.chunkSekunder;
+  $("noegleFil").value = i.noegleFil || "";
   $("demoTilstand").checked = i.provider === "demo";
   $("fontStoerrelse").value = i.overlay.skriftStoerrelse; $("fontVaerdi").textContent = i.overlay.skriftStoerrelse;
   $("baggrundAlpha").value = Math.round(i.overlay.baggrundAlpha * 100); $("alphaVaerdi").textContent = Math.round(i.overlay.baggrundAlpha * 100);
@@ -196,9 +197,12 @@ async function indlaesAlt() {
 
 async function opdaterNoegleStatus() {
   const s = await window.copilot.secrets.status();
-  $("noegleStatus").textContent = s.harNoegle
-    ? `nøgle gemt (kilde: ${s.kilde}) — kryptering: ${s.kryptering ? "DPAPI" : "utilgængelig"}`
-    : `ingen nøgle gemt — kryptering: ${s.kryptering ? "tilgængelig" : "UTILGÆNGELIG"}`;
+  if (s.harNoegle) {
+    const hvor = s.kilde === "nøglefil" && s.noegleFil ? ` (${s.noegleFil})` : "";
+    $("noegleStatus").textContent = `nøgle: ${s.kilde}${hvor} — DPAPI: ${s.kryptering ? "tilgængelig" : "utilgængelig"}`;
+  } else {
+    $("noegleStatus").textContent = `ingen nøgle — indsæt en, peg på en fil, eller brug Demo-tilstand (DPAPI: ${s.kryptering ? "tilgængelig" : "UTILGÆNGELIG"})`;
+  }
 }
 
 $("opdaterEnheder").onclick = () => hentEnheder().catch((e) => log("FEJL enhedsliste: " + e.message));
@@ -214,6 +218,22 @@ $("gemNoegle").onclick = async () => {
   await opdaterNoegleStatus();
 };
 $("sletNoegle").onclick = async () => { await window.copilot.secrets.slet(); log("Nøgle slettet"); await opdaterNoegleStatus(); };
+$("brugFil").onclick = async () => {
+  const sti = $("noegleFil").value.trim();
+  if (!sti) return log("FEJL skriv stien til nøglefilen først");
+  const r = await window.copilot.secrets.proevFil(sti);
+  if (!r.ok) return log("FEJL kunne ikke læse nøglefilen: " + r.fejl);
+  const g = await window.copilot.settings.gem({ noegleFil: sti });
+  if (!g.ok) return log("FEJL kunne ikke gemme indstillingen: " + g.fejl);
+  log("Nøglefil i brug: " + sti);
+  await opdaterNoegleStatus();
+};
+$("rydFil").onclick = async () => {
+  await window.copilot.settings.gem({ noegleFil: "" });
+  $("noegleFil").value = "";
+  log("Nøglefil fjernet — næste kald bruger DPAPI-nøglen eller miljøvariablen");
+  await opdaterNoegleStatus();
+};
 $("testForbindelse").onclick = async () => {
   $("testStatus").textContent = "tester…";
   const r = await window.copilot.testForbindelse();

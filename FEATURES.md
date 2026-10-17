@@ -1,6 +1,6 @@
 # Funktioner, begrænsninger og testresultater
 
-**Version:** 0.1.1 · **Opdateret:** 17-10-2026
+**Version:** 0.1.2 · **Opdateret:** 17-10-2026
 Simulerede tests og virkelige tests er markeret hver for sig.
 
 ## Fungerende funktioner
@@ -14,6 +14,7 @@ Simulerede tests og virkelige tests er markeret hver for sig.
 | Gennemsigtigt undertekst-overlay oven på PowerPoint | ✅ implementeret (altid øverst på `screen-saver`-niveau, klik-gennem) |
 | Overlay på valgt skærm + tekststørrelse og baggrund | ✅ implementeret (skærmvælger + skydere, live opdatering) |
 | Indtaste/udskifte/slette API-nøgle i brugerfladen | ✅ implementeret, krypteret med Windows DPAPI (`safeStorage`) |
+| **Pege på en nøglefil** i stedet for at indsætte nøglen | ✅ implementeret; 9 nye unit-tests + rigtigt API-kald fra filen (66 tokens, 3,5 s) |
 | Gemme transskription med tidsstempler (tekst + JSONL) | ✅ implementeret og afprøvet |
 | Netværksfejl og afbrudt lyd uden nedbrud | ✅ implementeret (3 genforsøg med backoff; automatisk genstart af lyd efter 2 s) |
 | Demo-tilstand uden API-nøgle | ✅ implementeret og afprøvet |

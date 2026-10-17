@@ -1,5 +1,5 @@
 // Unit-tests for Conference Co-Pilots kerne (ingen netvaerk, ingen Electron).
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -7,6 +7,7 @@ import {
   byggTranskriptLinje, byggTranskriptJson, beskrivFejl, erNetvaerksfejl, demoTranksriber, demoOversaet,
 } from "../src/pipeline.js";
 import { laesIndstillinger, gemIndstillinger, gemHemmelighed, laesHemmelighed, sletHemmelighed } from "../src/storage.js";
+import { laesNoegleFil, vaelgNoegle } from "../src/noegle.js";
 
 let ok = 0, alt = 0;
 const tjek = (navn, bestaaet, detalje = "") => {
@@ -93,6 +94,37 @@ try {
   tjek("hemmelighed kan slettes", !existsSync(hemmeligFil));
 } finally {
   rmSync(mappe, { recursive: true, force: true });
+}
+
+// ---- noegle fra fil (ny valgmulighed)
+{
+  const mappe2 = mkdtempSync(join(tmpdir(), "copilot-noegle-"));
+  try {
+    const gyldig = join(mappe2, "nokkel.txt");
+    writeFileSync(gyldig, "  " + ATTRAP_NOEGLE + "\n", "utf8");
+    tjek("noeglefil: gyldig fil laeses og trimmes", laesNoegleFil(gyldig).ok === true && laesNoegleFil(gyldig).noegle === ATTRAP_NOEGLE);
+
+    const tom = join(mappe2, "tom.txt");
+    writeFileSync(tom, "   \n", "utf8");
+    tjek("noeglefil: tom fil afvises", laesNoegleFil(tom).ok === false);
+
+    const kort = join(mappe2, "kort.txt");
+    writeFileSync(kort, "kort", "utf8");
+    tjek("noeglefil: for kort indhold afvises", laesNoegleFil(kort).ok === false);
+
+    const flerlinje = join(mappe2, "flere.txt");
+    writeFileSync(flerlinje, ATTRAP_NOEGLE + "\n" + ATTRAP_NOEGLE, "utf8");
+    tjek("noeglefil: flere linjer afvises", laesNoegleFil(flerlinje).ok === false);
+
+    tjek("noeglefil: manglende fil afvises", laesNoegleFil(join(mappe2, "findes-ikke.txt")).ok === false);
+
+    tjek("prioritet: miljoevariabel vinder over fil", vaelgNoegle({ miljoe: "miljoe-noegle-1234567890", noegleFil: gyldig, dpapi: "dpapi-noegle" }).kilde === "miljøvariabel");
+    tjek("prioritet: fil vinder over DPAPI", vaelgNoegle({ noegleFil: gyldig, dpapi: "dpapi-noegle" }).kilde === "nøglefil");
+    tjek("prioritet: DPAPI bruges naar fil mangler", vaelgNoegle({ noegleFil: join(mappe2, "findes-ikke.txt"), dpapi: "dpapi-noegle" }).kilde === "DPAPI");
+    tjek("prioritet: ingen kilde giver tom noegle", vaelgNoegle({}).kilde === "ingen" && vaelgNoegle({}).noegle === "");
+  } finally {
+    rmSync(mappe2, { recursive: true, force: true });
+  }
 }
 
 console.log("");

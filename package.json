@@ -1,7 +1,7 @@
 {
   "name": "conference-copilot",
   "productName": "Conference Co-Pilot",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Portable Windows live transcription + translation with a transparent subtitle overlay for PowerPoint",
   "type": "module",
   "main": "src/main.js",

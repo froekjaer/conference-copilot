@@ -13,6 +13,7 @@ import {
   laesIndstillinger, gemIndstillinger, gemHemmelighed, laesHemmelighed, sletHemmelighed,
   sikrMappe,
 } from "./storage.js";
+import { vaelgNoegle, laesNoegleFil } from "./noegle.js";
 
 const SELFTEST = process.argv.includes("--selftest");
 const dataMappe = app.isPackaged ? join(dirname(process.execPath), "data") : join(app.getAppPath(), "data");
@@ -32,10 +33,12 @@ const krypto = {
 };
 
 function hentNoegle() {
-  const fraMiljoe = process.env.CO_PILOT_API_KEY;
-  if (fraMiljoe && fraMiljoe.trim()) return { noegle: fraMiljoe.trim(), kilde: "miljøvariabel" };
-  const laest = laesHemmelighed(hemmelighedFil, krypto);
-  return laest.ok ? { noegle: laest.noegle, kilde: "DPAPI" } : { noegle: "", kilde: "ingen" };
+  const dpapi = laesHemmelighed(hemmelighedFil, krypto);
+  return vaelgNoegle({
+    miljoe: process.env.CO_PILOT_API_KEY,
+    noegleFil: indstillinger.noegleFil || "",
+    dpapi: dpapi.ok ? dpapi.noegle : "",
+  });
 }
 
 // ---------------------------------------------------------------- vinduer
@@ -106,7 +109,7 @@ const svar = (fn) => async (_evt, ...args) => {
 
 ipcMain.handle("info", svar(async () => {
   const n = hentNoegle();
-  return { version: app.getVersion(), dataMappe, pakket: app.isPackaged, noegleKilde: n.kilde, harNoegle: Boolean(n.noegle), kryptering: krypto.tilgaengelig() };
+  return { version: app.getVersion(), dataMappe, pakket: app.isPackaged, noegleKilde: n.kilde, harNoegle: Boolean(n.noegle), noegleFil: indstillinger.noegleFil || "", kryptering: krypto.tilgaengelig() };
 }));
 
 ipcMain.handle("displays", svar(async () => ({
@@ -124,7 +127,7 @@ ipcMain.handle("settings:set", svar(async (del) => {
 
 ipcMain.handle("secrets:status", svar(async () => {
   const n = hentNoegle();
-  return { harNoegle: Boolean(n.noegle), kilde: n.kilde, kryptering: krypto.tilgaengelig() };
+  return { harNoegle: Boolean(n.noegle), kilde: n.kilde, noegleFil: indstillinger.noegleFil || "", kryptering: krypto.tilgaengelig() };
 }));
 ipcMain.handle("secrets:set", svar(async (nyNoegle) => {
   if (!nyNoegle || !String(nyNoegle).trim()) throw new Error("tom noegle");
@@ -133,6 +136,11 @@ ipcMain.handle("secrets:set", svar(async (nyNoegle) => {
   return { kilde: "DPAPI" };
 }));
 ipcMain.handle("secrets:clear", svar(async () => { sletHemmelighed(hemmelighedFil); return { slettet: true }; }));
+ipcMain.handle("secrets:proev-fil", svar(async (sti) => {
+  const r = laesNoegleFil(sti);
+  if (!r.ok) throw new Error(r.fejl);
+  return { laest: true, sti: String(sti).trim() };
+}));
 
 ipcMain.handle("overlay:config", svar(async (del) => {
   indstillinger.overlay = { ...indstillinger.overlay, ...(del || {}) };

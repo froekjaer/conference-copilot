@@ -10,6 +10,7 @@ export const STANDARD_INDSTILLINGER = {
   kildeSprog: "da",
   maalSprog: "en",
   chunkSekunder: 6,
+  noegleFil: "",
   overlay: { skaermId: null, skriftStoerrelse: 34, baggrundAlpha: 0.55, visKilde: true, klikGennem: true },
 };
 
