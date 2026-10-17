@@ -1,9 +1,35 @@
 // Lagring: indstillinger (klartekst) og hemmeligheder (krypteret via Electron safeStorage = DPAPI paa Windows).
+// Indstillinger v2 samler overlay-geometri pr. skaerm, typografi, lydkilde og egne modeller.
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname } from "node:path";
+import { typografi } from "./layout.js";
+
+export const INDSTILLINGER_VERSION = 2;
+
+export const STANDARD_OVERLAY = {
+  skaermId: null,
+  skriftStoerrelse: 34,
+  skriftFamilie: "Segoe UI",
+  tekstFarve: "#ffffff",
+  konturFarve: "#000000",
+  konturPx: 2,
+  skygge: false,
+  baggrundFarve: "#000000",
+  baggrundAlpha: 0.55,
+  justering: "left",
+  visKilde: true,
+  maxLinjer: 3,
+  klikGennem: true,
+  redigering: false,
+  breddePct: 0.9,
+  hoejdePct: 0.22,
+  placering: { preset: "nederst", prSkarm: {} },
+};
 
 export const STANDARD_INDSTILLINGER = {
-  provider: "api",
+  version: INDSTILLINGER_VERSION,
+  provider: "openai",
+  demo: false,
   baseUrl: "https://api.openai.com/v1",
   sttModel: "whisper-1",
   mtModel: "gpt-4o-mini",
@@ -11,8 +37,58 @@ export const STANDARD_INDSTILLINGER = {
   maalSprog: "en",
   chunkSekunder: 6,
   noegleFil: "",
-  overlay: { skaermId: null, skriftStoerrelse: 34, baggrundAlpha: 0.55, visKilde: true, klikGennem: true },
+  egneModeller: [],
+  lydKilde: "mikrofon",
+  lydFil: "",
+  lydFilNavn: "",
+  lydUdgang: "",
+  hastighed: 1,
+  overlay: { ...STANDARD_OVERLAY },
 };
+
+/** Retter gamle/ugyldige indstillinger til v2 uden at kaste brugerens valg vaek. */
+export function normaliserIndstillinger(raa = {}) {
+  const j = { ...raa };
+  // v1 havde provider "api"/"demo" og ingen version
+  if (!j.version) {
+    if (j.provider === "demo") {
+      j.demo = true;
+      j.provider = "openai";
+    } else if (j.provider === "api" || !j.provider) {
+      j.provider = "openai";
+    }
+  }
+  const overlayRaa = { ...STANDARD_OVERLAY, ...(j.overlay || {}) };
+  const placeringRaa = { ...(overlayRaa.placering || {}) };
+  const prSkarm = {};
+  for (const [noegle, g] of Object.entries(placeringRaa.prSkarm || {})) {
+    if (g && Number.isFinite(Number(g.width)) && Number.isFinite(Number(g.height))) {
+      prSkarm[noegle] = { x: Number(g.x) || 0, y: Number(g.y) || 0, width: Number(g.width), height: Number(g.height) };
+    }
+  }
+  const overlay = {
+    ...overlayRaa,
+    ...typografi(overlayRaa),
+    placering: {
+      preset: ["øverst", "midten", "nederst", "brugerdefineret"].includes(placeringRaa.preset) ? placeringRaa.preset : "nederst",
+      prSkarm,
+    },
+    breddePct: Math.min(Math.max(Number(overlayRaa.breddePct) || 0.9, 0.2), 1),
+    hoejdePct: Math.min(Math.max(Number(overlayRaa.hoejdePct) || 0.22, 0.06), 0.9),
+    klikGennem: overlayRaa.klikGennem !== false,
+    redigering: Boolean(overlayRaa.redigering),
+  };
+  return {
+    ...STANDARD_INDSTILLINGER,
+    ...j,
+    version: INDSTILLINGER_VERSION,
+    demo: Boolean(j.demo),
+    chunkSekunder: Math.min(Math.max(Number(j.chunkSekunder) || 6, 3), 20),
+    hastighed: [0.75, 1, 1.25].includes(Number(j.hastighed)) ? Number(j.hastighed) : 1,
+    egneModeller: Array.isArray(j.egneModeller) ? j.egneModeller.filter((m) => m && m.id) : [],
+    overlay,
+  };
+}
 
 export function sikrMappe(filSti) {
   const mappe = dirname(filSti);
@@ -22,18 +98,17 @@ export function sikrMappe(filSti) {
 
 export function laesIndstillinger(filSti) {
   try {
-    if (!existsSync(filSti)) return { ...STANDARD_INDSTILLINGER };
-    const j = JSON.parse(readFileSync(filSti, "utf8"));
-    return { ...STANDARD_INDSTILLINGER, ...j, overlay: { ...STANDARD_INDSTILLINGER.overlay, ...(j.overlay || {}) } };
+    if (!existsSync(filSti)) return normaliserIndstillinger({});
+    return normaliserIndstillinger(JSON.parse(readFileSync(filSti, "utf8")));
   } catch {
-    return { ...STANDARD_INDSTILLINGER };
+    return normaliserIndstillinger({});
   }
 }
 
 export function gemIndstillinger(filSti, indstillinger) {
   try {
     sikrMappe(filSti);
-    writeFileSync(filSti, JSON.stringify(indstillinger, null, 2), "utf8");
+    writeFileSync(filSti, JSON.stringify(normaliserIndstillinger(indstillinger), null, 2), "utf8");
     return true;
   } catch {
     return false;

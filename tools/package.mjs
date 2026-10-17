@@ -24,7 +24,7 @@ console.log("2) kopierer Electron-runtime …");
 cpSync(kilde, ud, { recursive: true });
 
 console.log("3) kopierer app-filer …");
-for (const f of ["package.json", "src", "README.md", "FEATURES.md", "LICENSE"]) {
+for (const f of ["package.json", "src", "README.md", "FEATURES.md", "LICENSE", "docs"]) {
   cpSync(join(rod, f), join(appMappe, f), { recursive: true });
 }
 

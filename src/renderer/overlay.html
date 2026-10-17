@@ -1,26 +1,90 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="da">
 <head>
-  <meta charset="utf-8" />
-  <title>Overlay</title>
-  <style>
-    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-    #ramme {
-      position: absolute; inset: 8px; border-radius: 14px; padding: 18px 22px;
-      background: rgba(10, 12, 18, var(--alpha, .55));
-      backdrop-filter: blur(6px);
-      display: flex; flex-direction: column; justify-content: center; gap: 8px;
-      box-shadow: 0 6px 26px rgba(0,0,0,.35);
-    }
-    #kilde { color: #c9d6ea; font-size: calc(var(--skrift, 34px) * .62); line-height: 1.25; opacity: .92; }
-    #oversat { color: #ffffff; font-size: var(--skrift, 34px); line-height: 1.25; font-weight: 600; text-shadow: 0 2px 10px rgba(0,0,0,.55); }
-    #kilde:empty { display: none; }
-  </style>
+<meta charset="utf-8" />
+<title>Undertekst</title>
+<style>
+  :root {
+    --skrift: 34px;
+    --familie: "Segoe UI", system-ui, sans-serif;
+    --tekst: #ffffff;
+    --bg: rgba(0, 0, 0, 0.55);
+    --justering: left;
+    --linjer: 3;
+    --kontur-px: 2px;
+    --kontur-farve: #000000;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: transparent; overflow: hidden; }
+  body { display: flex; align-items: stretch; }
+
+  .ramme {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35em;
+    padding: 18px 26px;
+    background: var(--bg);
+    border-radius: 14px;
+    overflow: hidden;
+    font-family: var(--familie);
+    text-align: var(--justering);
+    align-items: var(--justering === center ? center : flex-start);
+  }
+
+  .kilde {
+    font-size: calc(var(--skrift) * 0.62);
+    line-height: 1.25;
+    color: color-mix(in srgb, var(--tekst) 78%, transparent);
+    max-height: 2.6em;
+    overflow: hidden;
+    display: block;
+    width: 100%;
+  }
+
+  .oversat {
+    font-size: var(--skrift);
+    font-weight: 600;
+    line-height: 1.22;
+    color: var(--tekst);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--linjer);
+    overflow: hidden;
+    width: 100%;
+    word-break: break-word;
+  }
+
+  .hjaelp { display: none; }
+
+  body.redigering .ramme {
+    border: 2px dashed rgba(120, 200, 255, 0.9);
+    -webkit-app-region: drag;
+    cursor: move;
+  }
+  body.redigering .hjaelp {
+    display: block;
+    position: absolute;
+    top: 6px;
+    left: 10px;
+    font: 12px/1.2 "Segoe UI", sans-serif;
+    color: #bfe6ff;
+    background: rgba(10, 20, 30, 0.75);
+    padding: 2px 8px;
+    border-radius: 6px;
+    -webkit-app-region: no-drag;
+  }
+  body.redigering .kilde, body.redigering .oversat { -webkit-app-region: no-drag; }
+  body.redigering .ramme { -webkit-app-region: drag; }
+  body.redigering .oversat, body.redigering .kilde { pointer-events: none; }
+</style>
 </head>
 <body>
-  <div id="ramme">
-    <div id="kilde"></div>
-    <div id="oversat">Conference Co-Pilot klar</div>
+  <div class="ramme" id="ramme">
+    <div class="hjaelp">Redigeringstilstand — træk for at flytte</div>
+    <div class="kilde" id="kilde"></div>
+    <div class="oversat" id="oversat"></div>
   </div>
   <script src="overlay.js"></script>
 </body>
